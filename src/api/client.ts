@@ -1,5 +1,6 @@
 // Live link to an oven through june-local: REST snapshot + companion WebSocket.
 import { rehomeMediaUrl, urls, type Connection } from './endpoint';
+import { MODES } from './modes';
 import { MC, OrderGenerator, buildSignedFrame, type CompanionKeys } from './protocol';
 
 // --- Shared types ------------------------------------------------------------
@@ -267,8 +268,9 @@ export class LiveOven implements OvenLink {
         patch.probeC = probe ? probe.value / 1000 : null;
         const cs = d.cook_state_data;
         if (cs) {
+          // Always 0–100 on the wire (0.99 is 1% of the preheat gap, not 99%).
           const pct = num(cs.progress?.percentage);
-          patch.progress = pct === null ? null : pct > 1 ? pct / 100 : pct;
+          patch.progress = pct === null ? null : Math.max(0, Math.min(1, pct / 100));
           patch.remainingMs = num(cs.cook_time_remaining);
           patch.remainingAt = Date.now();
           patch.elapsedMs = num(cs.cook_time_elapsed);
@@ -355,11 +357,15 @@ export class LiveOven implements OvenLink {
     const status = await this.command(MC.SetCavityTemp, { plan_id: this.s.planId, temperature_cavity: Math.round(tempC * 1000) });
     if (status === 'success') { this.set({ targetC: tempC }); return; }
     // Some firmware rejects a live change; restart the cook at the new temperature,
-    // as the Home Assistant integration does.
-    if (!this.s.mode) throw ackError(status);
+    // as the Home Assistant integration does. Only after a definite refusal (a
+    // timeout may still have applied it), and only for a cook the phone can start
+    // again: 11002 cooks run as plan 0, while touchscreen programs such as proof
+    // (plan 114) share a mode name but can't be restarted from here.
+    const mode = this.s.mode;
+    if (status === null || !mode || this.s.planId !== 0 || !MODES.some((m) => m.id === mode)) throw ackError(status);
     await this.cancel();
     await new Promise((r) => setTimeout(r, 400));
-    await this.preheat(this.s.mode, tempC);
+    await this.preheat(mode, tempC);
   }
 
   async setTimer(ms: number) {

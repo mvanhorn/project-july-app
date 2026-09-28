@@ -94,11 +94,11 @@ class SimOven {
     switch (f.message_code) {
       case 11002: {
         ack();
-        const plan = { food: { name: f.data.primitive_type, plan: { id: 7, steps: [{ id: 1, temperature_cavity: f.data.temperature_cavity }] } }, step_state: { step_index: 0 } };
+        const plan = { food: { name: f.data.primitive_type, plan: { id: 0, steps: [{ id: 1, temperature_cavity: f.data.temperature_cavity }] } }, step_state: { step_index: 0 } };
         this.send(10014, plan);
         this.send(10018, { state: 'active' });
         this.cavity = 60_000;
-        this.send(10013, { sensor_data: { cavity: this.cavity, probe: [] }, cook_state_data: { progress: { percentage: 0.2, label_type: 'temperature' } }, cook_plan_data: plan });
+        this.send(10013, { sensor_data: { cavity: this.cavity, probe: [] }, cook_state_data: { progress: { percentage: 20, label_type: 'temperature' } }, cook_plan_data: plan });
         this.send(10011, { image_url: 'https://api.junelife.com/media/prod/images/latest.jpg?ts=1' });
         return;
       }
@@ -168,7 +168,8 @@ async function main() {
   const s = link.snapshot();
   assert.equal(s.active, true);
   assert.equal(s.mode, 'bake');
-  assert.equal(s.planId, 7);
+  assert.equal(s.planId, 0); // phone-started cooks run as plan 0
+  assert.equal(s.progress, 0.2);
   assert.equal(s.phase, 'preheating');
   assert.ok(Math.abs((s.targetC ?? 0) - 176.667) < 0.01);
   await until('camera frame', () => link.snapshot().imageUrl);
@@ -177,7 +178,7 @@ async function main() {
 
   await link.setTimer(20 * 60_000);
   const timer = oven.received.find((f) => f.message_code === 11006);
-  assert.deepEqual(timer.data, { plan_id: 7, duration: 1_200_000 });
+  assert.deepEqual(timer.data, { plan_id: 0, duration: 1_200_000 });
   console.log('✓ timer set with the live plan_id');
 
   await link.setTemperature(190);
