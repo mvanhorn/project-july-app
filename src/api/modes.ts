@@ -38,10 +38,8 @@ export const MODES: CookMode[] = [
 /**
  * Mode tiles on the glass home screen, in the oven's order: the Home Assistant card's
  * five (bake, roast, broil, air fry, toast) first, then the other untested ones.
- * By default they are paged, as on the card: PAGE_TILES (its 4 × 2) to a page, with
- * Camera and Settings always last, on the last page.
+ * Camera follows; the card sizes the grid to the phone (GlassHero).
  */
-export const PAGE_TILES = 8;
 export const TILE_MODES = ['bake', 'roast', 'broil', 'airfry', 'toast', 'pizzaiolo', 'reheat', 'warm', 'dehydrate', 'proof', 'slow_cook']
   .map((id) => MODES.find((m) => m.id === id)!);
 

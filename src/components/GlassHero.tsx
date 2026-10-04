@@ -1,8 +1,9 @@
 // The Still Glass oven tile: the Home Assistant July Oven card's layout on a phone
 // (prj-july/ha-june-oven, docs/july-oven-card/DESIGN.md, v0.4.1). One job per state:
 //
-//   off      the oven's home screen: its icon and name top left, the clock, then the
-//            mode tiles with Camera and Settings last (4 × 3 here: a phone has the height)
+//   off      the oven's home screen: its icon and name top left, the clock, the last
+//            cook with Repeat, then the mode tiles and Camera, four across, sized to
+//            the phone (Settings is in the top bar)
 //   running  icon + name, red Stop | big number, status line, heat line | 4:3 camera
 //            +1 · +5 · +10 while a timer runs
 //   done     "Take food out", with Food is out in Stop's place
@@ -12,11 +13,11 @@
 // The camera opens a floating window over the card. Every margin is the card's
 // padding, measured to the ink.
 import { useCallback, useRef, useState, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import type { OvenSnapshot } from '@/api/client';
-import { formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
+import { fToC, formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
 import { useOven } from '@/state/oven';
 import { space, useTheme } from '@/theme';
 import { CameraWindow } from './CameraWindow';
@@ -30,22 +31,6 @@ import { Chip, ProgressBar, type BarKind } from './ui';
 const DEMO_IMAGE = require('../../assets/demo-camera.jpg');
 const PX = 16;
 const GAP = 16;
-/**
- * Home screen tile layouts. 'pages' ships: 4 × 2 to a page, swiping for the rest.
- * The others are options under review, shown only in web dev builds with ?grid=
- * (the phone board's "Home screen layouts" row):
- *   fit    four across, as many rows as the screen has room for; pages only if needed
- *   4x4    four rows, one page on most phones
- *   4x3    three rows, Settings only in the top bar (12 tiles)
- *   3col   three across with bigger tiles, four rows to a page
- *   clock  4 × 2 with a bigger clock and a last-cook row (sample text)
- */
-type GridLayout = 'pages' | 'fit' | '4x4' | '4x3' | '3col' | 'clock';
-const LAYOUTS: GridLayout[] = ['pages', 'fit', '4x4', '4x3', '3col', 'clock'];
-const DEV_GRID: GridLayout | null = __DEV__ && Platform.OS === 'web' && typeof window !== 'undefined'
-  ? LAYOUTS.find((g) => g === new URLSearchParams(window.location.search).get('grid')) ?? null
-  : null;
-
 /** Done lasts 30 minutes after the cook completes, unless dismissed. */
 export const DONE_WINDOW_MS = 30 * 60_000;
 
@@ -58,11 +43,24 @@ type Props = {
   stopping: boolean;
   onAddMinutes: (min: number) => void;
   onMode: (mode: string) => void;
-  onSettings: () => void;
+  /** Open the review for the last cook again (mode and °F). */
+  onRepeat: (mode: string, tempF: number) => void;
   /** The last cook completed and nobody dismissed it; `at` is when, if known. */
   done: { at: number | null } | null;
   onDismissDone: () => void;
 };
+
+/** "Today 18:20", "Yesterday 18:20", "Sunday 18:20", or the date further back. */
+function when(at: number, now: number) {
+  const d = new Date(at);
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const day = (t: number) => Math.floor((t - new Date(t).getTimezoneOffset() * 60_000) / 86_400_000);
+  const days = day(now) - day(at);
+  if (days <= 0) return `Today ${time}`;
+  if (days === 1) return `Yesterday ${time}`;
+  if (days < 7) return `${d.toLocaleDateString([], { weekday: 'long' })} ${time}`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
 function ago(ms: number) {
   const m = Math.round(ms / 60_000);
@@ -130,17 +128,22 @@ function model(s: OvenSnapshot, unit: Unit, left: number | null, now: number, do
 
 export function GlassHero(p: Props) {
   const { c, f, r } = useTheme();
-  const { prefs, uses } = useOven();
+  const { prefs, uses, lastCook } = useOven();
   const [w, setW] = useState(372);
   const [camera, setCamera] = useState(false);
   const [page, setPage] = useState(0);
   const pager = useRef<ScrollView>(null);
   const { height: winH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const gridRef = useRef<View>(null);
-  const [gridTop, setGridTop] = useState<number | null>(null);
+  const cardRef = useRef<View>(null);
+  const [cardTop, setCardTop] = useState<number | null>(null);
   // Screens hidden in the stack lay out at 0 wide; keep the last real width.
-  const onLayout = (e: LayoutChangeEvent) => { const lw = e.nativeEvent.layout.width; if (lw >= 200) setW(lw); };
+  const onLayout = (e: LayoutChangeEvent) => {
+    const lw = e.nativeEvent.layout.width;
+    if (lw >= 200) setW(lw);
+    // Where the card starts on screen, to size the home screen to the room below it.
+    cardRef.current?.measureInWindow((_x, y) => setCardTop(Math.round(y)));
+  };
   const closeCamera = useCallback(() => setCamera(false), []);
   const s = p.s;
   const now = useNow(true, 1000);
@@ -151,7 +154,7 @@ export function GlassHero(p: Props) {
   const home = !offline && !s.active && !done;
 
   const shell = (children: ReactNode) => (
-    <View onLayout={onLayout} style={[styles.card, { borderRadius: r.lg, borderColor: c.line, backgroundColor: c.surfaceRaised }]}>
+    <View ref={cardRef} onLayout={onLayout} style={[styles.card, { borderRadius: r.lg, borderColor: c.line, backgroundColor: c.surfaceRaised }]}>
       <GlassFill />
       {children}
       {camera ? <CameraWindow name={p.name} heating={s.active} onClose={closeCamera} /> : null}
@@ -167,41 +170,46 @@ export function GlassHero(p: Props) {
     // The oven's clock: no AM/PM.
     const clock = `${hour12 ? h % 12 || 12 : String(h).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     const date = d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
-    const layout: GridLayout = DEV_GRID ?? 'pages';
-    const clockSize = layout === 'clock' ? Math.min(w * 0.26, 110) : Math.min(w * 0.15, 76);
-    // Four across (three for '3col'), reaching the card's padding on both sides
-    // (DESIGN.md: equal margins).
-    const cols = layout === '3col' ? 3 : 4;
+    // Last cook, for Repeat (nothing until the first one). The demo shows a sample so
+    // the row can be reviewed.
+    const last = lastCook ?? (p.demo ? { mode: 'bake', tempF: 400, at: now - 26 * 3_600_000 } : null);
+    // Four across, reaching the card's padding on both sides (DESIGN.md: equal margins).
+    const cols = 4;
     const gap = Math.min(20, Math.max(10, w * 0.034));
     const tile = Math.floor(Math.min((inner - (cols - 1) * gap) / cols, 104));
     // A row: the tile, 7 px, a 20 px label, then 10 px to the next row.
     const rowPitch = tile + 37;
-    const gridMargin = layout === 'clock' ? space[4] : space[8];
-    // The modes first, Camera and Settings always last (on the last page).
+    // The modes, then Camera. Settings lives in the top bar.
     type Tile = { id: string; label: string; util?: boolean; untested?: boolean };
     const tiles: Tile[] = [
       ...tileModes(prefs.modeOrder, uses).map((m) => ({ id: m.id, label: m.label, untested: m.untested })),
       { id: 'camera', label: 'Camera', util: true },
-      ...(layout === '4x3' ? [] : [{ id: 'settings', label: 'Settings', util: true }]),
     ];
-    // Rows that fit: as many as the screen has room for below the grid, keeping the
-    // screen's bottom margin, and the page dots' room only when there will be pages.
-    const fitRows = (dots: boolean) => {
-      if (gridTop === null) return 2;
-      const room = winH - gridTop - gridMargin - PX - space[8] - insets.bottom - (dots ? 36 : 0) + 10;
-      return Math.max(1, Math.floor(room / rowPitch));
-    };
-    const rowsPerPage =
-      layout === 'fit' ? (fitRows(false) * cols >= tiles.length ? fitRows(false) : fitRows(true))
-      : layout === '4x4' || layout === '3col' ? 4
-      : layout === '4x3' ? 3
-      : 2;
-    const perPage = prefs.modesShown === 'all' ? tiles.length : cols * rowsPerPage;
+    const rowsNeeded = Math.ceil(tiles.length / cols);
+    // Sized to the phone: the oven-sized clock if every row still fits below it; else
+    // the clock shrinks (down to the card's size) to make them fit; only then pages.
+    const bigClock = Math.min(w * 0.26, 110);
+    const smallClock = Math.min(w * 0.15, 76);
+    const clockH = (size: number) => size * 0.8 + 22;
+    const gridH = (rows: number, dots: boolean) => rows * rowPitch - 10 + (dots ? 36 : 0);
+    const above = (last ? 56 + space[4] : 0) + space[5];
+    // The card's room: from its top to the screen's bottom margin, less its padding.
+    const room = cardTop === null ? null : winH - cardTop - 2 * PX - space[8] - insets.bottom - above;
+    let clockSize = bigClock;
+    let rowsPerPage = rowsNeeded;
+    if (room !== null && clockH(bigClock) + gridH(rowsNeeded, false) > room) {
+      const fit = (room - gridH(rowsNeeded, false) - 22) / 0.8;
+      if (fit >= smallClock) clockSize = fit;
+      else {
+        clockSize = smallClock;
+        rowsPerPage = Math.max(1, Math.floor((room - clockH(smallClock) - 36 + 10) / rowPitch));
+      }
+    }
     const pages: Tile[][] = [];
-    for (let i = 0; i < tiles.length; i += perPage) pages.push(tiles.slice(i, i + perPage));
-    const grid = (tiles: Tile[]) => {
+    for (let i = 0; i < tiles.length; i += cols * rowsPerPage) pages.push(tiles.slice(i, i + cols * rowsPerPage));
+    const grid = (pageTiles: Tile[]) => {
       const rows: Tile[][] = [];
-      for (let i = 0; i < tiles.length; i += cols) rows.push(tiles.slice(i, i + cols));
+      for (let i = 0; i < pageTiles.length; i += cols) rows.push(pageTiles.slice(i, i + cols));
       // Every page keeps the first page's rows, so swiping never changes the card's height.
       while (pages.length > 1 && rows.length < rowsPerPage) rows.push([]);
       return (
@@ -217,7 +225,7 @@ export function GlassHero(p: Props) {
                   untested={t.untested}
                   size={tile}
                   labelWidth={tile + gap}
-                  onPress={() => (t.id === 'camera' ? setCamera(true) : t.id === 'settings' ? p.onSettings() : p.onMode(t.id))}
+                  onPress={() => (t.id === 'camera' ? setCamera(true) : p.onMode(t.id))}
                   accessibilityLabel={t.util ? `${t.label} for ${p.name}` : `${t.label}${t.untested ? ', untested' : ''}: review and start`}
                 />
               ))}
@@ -229,6 +237,7 @@ export function GlassHero(p: Props) {
       );
     };
     const goTo = (i: number) => { pager.current?.scrollTo({ x: i * w, animated: true }); setPage(i); };
+    const lastTemp = last ? (p.unit === 'F' ? `${last.tempF} °F` : `${Math.round(fToC(last.tempF))} °C`) : '';
     return shell(
       <View style={{ padding: PX }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[2] }}>
@@ -241,24 +250,23 @@ export function GlassHero(p: Props) {
           </View>
           <View style={{ flex: 1 }} />
         </View>
-        {layout === 'clock' ? (
-          // Layout preview only (?grid=clock): sample text, not a real last cook.
+        {last ? (
+          // Repeat opens the review with the same mode and temperature: nothing heats until Start.
           <Pressable
             accessibilityRole="button"
-            onPress={() => p.onMode('bake')}
+            accessibilityLabel={`Repeat the last cook, ${modeLabel(last.mode)} at ${lastTemp}: review and start`}
+            onPress={() => p.onRepeat(last.mode, last.tempF)}
             style={({ pressed }) => [styles.last, { borderRadius: r.md, borderColor: c.line, backgroundColor: pressed ? c.surfaceSunken : 'transparent' }]}
           >
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: f.sansMedium, fontSize: 16, color: c.ink }}>Last cook: Bake 400 °F</Text>
-              <Text style={{ fontFamily: f.sans, fontSize: 14, color: c.inkMuted }}>Sunday 18:20</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 21, color: c.ink }}>{`Last cook: ${modeLabel(last.mode)} ${lastTemp}`}</Text>
+              <Text numberOfLines={1} style={{ fontFamily: f.sans, fontSize: 14, lineHeight: 19, color: c.inkMuted }}>{when(last.at, now)}</Text>
             </View>
-            <Text style={{ fontFamily: f.sansStrong, fontSize: 16, color: c.ember }}>Again</Text>
+            <Text style={{ fontFamily: f.sansStrong, fontSize: 16, color: c.ember }}>Repeat</Text>
           </Pressable>
         ) : null}
-        {/* Where the grid starts on screen, for rows that fit. */}
-        <View ref={gridRef} onLayout={() => gridRef.current?.measureInWindow((_x, y) => setGridTop(Math.round(y)))}>
         {pages.length === 1 ? (
-          <View style={{ marginTop: gridMargin }}>{grid(pages[0])}</View>
+          <View style={{ marginTop: space[5] }}>{grid(pages[0])}</View>
         ) : (
           <>
             <ScrollView
@@ -268,7 +276,7 @@ export function GlassHero(p: Props) {
               showsHorizontalScrollIndicator={false}
               scrollEventThrottle={32}
               onScroll={(e) => { const i = Math.round(e.nativeEvent.contentOffset.x / w); setPage((pg) => (pg === i ? pg : i)); }}
-              style={{ marginTop: gridMargin, marginHorizontal: -PX }}
+              style={{ marginTop: space[5], marginHorizontal: -PX }}
               accessibilityLabel={`Cook modes, ${pages.length} pages`}
             >
               {pages.map((pg, i) => (
@@ -294,7 +302,6 @@ export function GlassHero(p: Props) {
             </View>
           </>
         )}
-        </View>
       </View>,
     );
   }

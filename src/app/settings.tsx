@@ -4,7 +4,6 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { probe, urls, type ProbeResult } from '@/api/endpoint';
-import { PAGE_TILES } from '@/api/modes';
 import { NO_TRUST } from '@/api/trust';
 import { CertificatePanel } from '@/components/CertificatePanel';
 import { Button, Card, Divider, Notice, Row, Screen, SectionLabel, Segmented, T, confirm } from '@/components/ui';
@@ -172,13 +171,6 @@ function HomeScreenSettings() {
           options={[{ value: 'oven', label: 'Oven’s order' }, { value: 'used', label: 'Most used first' }]}
         />
         <T v="small" muted>Most used first counts the cooks started from this phone.</T>
-        <Segmented
-          label="Cook modes on the home screen"
-          value={prefs.modesShown}
-          onChange={(v) => setPref('modesShown', v)}
-          options={[{ value: 'pages', label: 'Pages' }, { value: 'all', label: 'All on one' }]}
-        />
-        <T v="small" muted>{`Pages: ${PAGE_TILES} tiles to a page in this order, swiping for the rest, with Camera and Settings on the last page.`}</T>
       </View>
 
       <View style={{ gap: space[3] }}>

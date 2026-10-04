@@ -166,7 +166,7 @@ function Dashboard() {
           stopping={busy === 'cancel'}
           onAddMinutes={(min) => run('timer', () => link!.setTimer((left ?? 0) + min * 60_000))}
           onMode={(mode) => router.push({ pathname: '/cook', params: { mode } })}
-          onSettings={() => router.push('/settings')}
+          onRepeat={(mode, tempF) => router.push({ pathname: '/cook', params: { mode, temp: String(tempF) } })}
           done={done}
           onDismissDone={() => setDismissedDone(true)}
         />

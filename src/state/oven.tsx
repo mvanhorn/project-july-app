@@ -27,8 +27,6 @@ export type Prefs = {
   clock: 'auto' | '12' | '24';
   /** Mode tiles in the oven's order, or most used first. */
   modeOrder: 'oven' | 'used';
-  /** Mode tiles in pages you swipe (8 to a page, Camera and Settings last), or all on one. */
-  modesShown: 'pages' | 'all';
   /** The stored shape: 2 from the 15 fps default on (older saves have none). */
   version: number;
 };
@@ -39,10 +37,14 @@ export type Prefs = {
  * the camera window or Live view is open.
  */
 export const CAMERA_FPS = [1, 5, 10, 15];
-const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'pages', version: 2 };
+const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 'auto', modeOrder: 'oven', version: 2 };
 
 /** Cooks started from this phone, per mode. Kept apart from the settings, so Reset keeps them. */
 export type Uses = Record<string, number>;
+
+/** The last cook started from this phone, for Repeat on the home screen. */
+export type LastCook = { mode: string; tempF: number; at: number };
+const LAST_KEY = 'july.last.v1';
 
 type Ctx = {
   ready: boolean;
@@ -57,6 +59,9 @@ type Ctx = {
   uses: Uses;
   /** Count a cook started from this phone (on a successful start only). */
   countUse(mode: string): void;
+  lastCook: LastCook | null;
+  /** Remember a cook the oven accepted, for Repeat. */
+  recordCook(mode: string, tempF: number): void;
   trusts: Record<string, Trust>;
   /** Trust `host`'s certificate this way from now on (saved), or only as the phone does (null). */
   setHostTrust(host: string, trust: Trust | null): void;
@@ -77,6 +82,7 @@ export function OvenProvider({ children }: { children: ReactNode }) {
   const [link, setLink] = useState<OvenLink | null>(null);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [uses, setUses] = useState<Uses>({});
+  const [lastCook, setLastCook] = useState<LastCook | null>(null);
   const [trusts, setTrusts] = useState<Record<string, Trust>>({});
 
   useEffect(() => {
@@ -84,6 +90,7 @@ export function OvenProvider({ children }: { children: ReactNode }) {
       const [p, pr, u, tr] = await Promise.all([
         load<Paired>(PAIRED_KEY), load<Partial<Prefs>>(PREFS_KEY), load<Uses>(USES_KEY), load<Record<string, Trust>>(TRUST_KEY),
       ]);
+      load<LastCook>(LAST_KEY).then((l) => { if (l) setLastCook(l); });
       if (pr) {
         const next = { ...DEFAULT_PREFS, ...pr };
         // Saves from before the 15 fps default carry the old default (1), stored with
@@ -138,6 +145,11 @@ export function OvenProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
+  const recordCook = useCallback((mode: string, tempF: number) => {
+    const next = { mode, tempF, at: Date.now() };
+    setLastCook(next);
+    save(LAST_KEY, next);
+  }, []);
   const countUse = useCallback((mode: string) => {
     setUses((u) => { const next = { ...u, [mode]: (u[mode] ?? 0) + 1 }; save(USES_KEY, next); return next; });
   }, []);
@@ -171,8 +183,8 @@ export function OvenProvider({ children }: { children: ReactNode }) {
 
 
   const value = useMemo<Ctx>(
-    () => ({ ready, paired, link, snap, prefs, setUnit, setPref, resetPrefs, uses, countUse, trusts, setHostTrust, updateConnection, completePairing, startDemo, forget }),
-    [ready, paired, link, snap, prefs, setUnit, setPref, resetPrefs, uses, countUse, trusts, setHostTrust, updateConnection, completePairing, startDemo, forget],
+    () => ({ ready, paired, link, snap, prefs, setUnit, setPref, resetPrefs, uses, countUse, lastCook, recordCook, trusts, setHostTrust, updateConnection, completePairing, startDemo, forget }),
+    [ready, paired, link, snap, prefs, setUnit, setPref, resetPrefs, uses, countUse, lastCook, recordCook, trusts, setHostTrust, updateConnection, completePairing, startDemo, forget],
   );
   return <OvenContext.Provider value={value}>{children}</OvenContext.Provider>;
 }

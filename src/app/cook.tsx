@@ -20,14 +20,16 @@ const STEP_F = 5;
 
 export default function Cook() {
   const { look } = useTheme();
-  const { link, prefs, countUse } = useOven();
+  const { link, prefs, countUse, recordCook } = useOven();
   const glass = look.hero === 'glass';
   const unit = prefs.unit;
-  const params = useLocalSearchParams<{ mode?: string }>();
+  // `temp` (°F) comes from Repeat on the home screen: the last cook's temperature.
+  const params = useLocalSearchParams<{ mode?: string; temp?: string }>();
   const [modeId, setModeId] = useState(MODES.some((m) => m.id === params.mode) ? params.mode! : 'bake');
   const mode = MODES.find((m) => m.id === modeId)!;
   // Held in °F on 5° steps, the oven's native scale; °C is shown rounded.
-  const [tempF, setTempF] = useState(mode.defaultF);
+  const asked = Number(params.temp);
+  const [tempF, setTempF] = useState(asked >= mode.minF && asked <= mode.maxF ? Math.round(asked / 5) * 5 : mode.defaultF);
   const [timerMin, setTimerMin] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +51,7 @@ export default function Cook() {
       await link.preheat(mode.id, fToC(tempF));
       // Counted only when the oven accepts: a review opened and cancelled is not a use.
       countUse(mode.id);
+      recordCook(mode.id, tempF);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       if (timerMin) await link.setTimer(timerMin * 60_000).catch(() => {});
       router.back();

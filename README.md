@@ -13,12 +13,15 @@ Light / Dark):
   The oven tile follows the card's layout (v0.4.1): the oven's icon as its lamp (orange
   while heating) with its name and a one-tap red Stop, a big number with a status mark
   (↑ preheating, ✓ ready, flame cooking), the heat line, a 4:3 camera and +1/+5/+10
-  buttons. When the oven is off it shows the home screen: the clock and glowing mode
-  tiles in pages of 4 × 2 you swipe, with page dots you can also tap, and Camera and
-  Settings always last, on the last page (or all on one, in Settings). Modes not yet started on a real oven carry a "?". The
-  name tucks into the icon after 5 s. Camera opens a floating window over the tile. Starting goes through a
-  review with a slider and a typed temperature, which warns the oven must be empty and
-  closes itself after 5 minutes.
+  buttons. When the oven is off it shows the home screen: an oven-sized clock, the last
+  cook with **Repeat** (which opens its review with the same mode and temperature), and
+  glowing mode tiles four across with Camera last; Settings is in the top bar. It sizes
+  itself to the phone: the big clock if every row fits, a smaller clock to make them
+  fit, and only then pages you swipe (with page dots you can also tap). Modes not yet
+  started on a real oven carry a "?". The name tucks into the icon after 5 s. Camera
+  opens a floating window over the tile. Starting goes through a review with a slider
+  and a typed temperature, which warns the oven must be empty and closes itself after
+  5 minutes.
 - **July** is the original July Oven design system (`../../design-system`): warm
   neutrals, one ember accent, Fraunces / Public Sans / IBM Plex Mono, and soft cards.
 
@@ -169,9 +172,8 @@ bundle requests can keep it busy.
 
 The oven states come from `?demo=<state>` (web dev builds only), so any screen can
 be opened on its own too, for example `http://localhost:8081/?demo=cooking`.
-Below them, **Home screen layouts** shows the tile layouts under review side by
-side (`?grid=pages|fit|4x4|4x3|3col|clock`, also web dev only; see `GlassHero.tsx`).
-Switch the device size at the top to compare them on each phone.
+The home screen sizes itself to the phone, so switch the device size at the top
+to see it on each.
 
 ### Build an APK on this machine
 
