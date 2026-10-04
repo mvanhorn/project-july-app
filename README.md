@@ -148,6 +148,28 @@ If EAS can't resolve the project's git root (for example when building from a
 mapped network drive), set `EAS_NO_VCS=1`. EAS then uploads the folder as-is,
 filtered by `.easignore`. Building from a local copy of the folder also works.
 
+### Phone board (review every screen at once)
+
+`public/phones.html` shows the app's screens side by side in phone-sized frames:
+Welcome, Set up, Pair, the home screen in each oven state (preheating, ready,
+cooking, probe, done, offline), the start review, Settings and the camera. Pick
+the device size (your phone, small Android, iPhone, iPhone SE) and zoom at the
+top. Each frame is the real web dev build, so you can tap and scroll in it.
+
+```bash
+npx expo start --web
+```
+
+Then open **http://localhost:8081/phones.html**. To review from another computer
+on the same network, open `http://<this computer's IP>:8081/phones.html` instead
+(`ipconfig` shows the IP; Windows may ask once to let Node through its firewall).
+The frames load two at a time, the ones in view first, so the board fills in
+over a few seconds. If every frame stays blank, restart the dev server: piled-up
+bundle requests can keep it busy.
+
+The oven states come from `?demo=<state>` (web dev builds only), so any screen can
+be opened on its own too, for example `http://localhost:8081/?demo=cooking`.
+
 ### Build an APK on this machine
 
 No EAS and no build quota: one command builds an APK to send to any Android phone.

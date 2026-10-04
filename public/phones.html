@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone Board</title>
+<style>
+  :root { --bg: #1b1b1d; --panel: #26262a; --ink: #ececec; --muted: #9a9aa2; --line: #3a3a40; --bezel: #0b0b0c; --accent: #e8913a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4 system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+           padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header b { font-size: 15px; margin-right: 4px; }
+  label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+  select, button { background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; font: inherit; }
+  button { cursor: pointer; } button:hover { border-color: var(--accent); }
+  main { display: flex; flex-wrap: wrap; gap: 28px; padding: 20px 16px 40px; align-items: flex-start; }
+  figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  figcaption { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; }
+  figcaption a { color: var(--muted); text-decoration: none; } figcaption a:hover { color: var(--accent); }
+  .slot { position: relative; overflow: hidden; }
+  .phone { position: absolute; top: 0; left: 0; transform-origin: 0 0; background: var(--bezel); border-radius: 44px; padding: 12px;
+           box-shadow: 0 0 0 1px #444 inset, 0 10px 30px rgba(0,0,0,.45); }
+  .screen { position: relative; overflow: hidden; border-radius: 32px; background: #000; display: flex; flex-direction: column; }
+  .bar { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; color: #fff; font: 600 13px system-ui; background: #000; }
+  .nav { flex: none; display: flex; align-items: center; justify-content: center; background: #000; }
+  .nav i { width: 108px; height: 4px; border-radius: 2px; background: #ddd; }
+  iframe { flex: 1; width: 100%; border: 0; background: #000; display: block; }
+</style>
+</head>
+<body>
+<header>
+  <b>Project July · phone board</b>
+  <label>Device
+    <select id="device">
+      <option value="412,915,32,24">Android 412 × 915 (your phone)</option>
+      <option value="360,800,28,24">Small Android 360 × 800</option>
+      <option value="393,852,54,34">iPhone 393 × 852</option>
+      <option value="375,667,20,0">iPhone SE 375 × 667</option>
+    </select>
+  </label>
+  <label>Zoom
+    <select id="zoom">
+      <option value="1">100%</option>
+      <option value="0.75">75%</option>
+      <option value="0.6" selected>60%</option>
+      <option value="0.45">45%</option>
+    </select>
+  </label>
+  <button id="reload" title="Reload every phone, e.g. after changing the theme in Settings">Reload all</button>
+</header>
+<main id="board"></main>
+<script>
+  // Opened on the machine running the dev server, the phones load from its other name
+  // (localhost <-> 127.0.0.1): a different site, so they can get their own processes
+  // instead of all sharing the board's one thread. Opened from another computer (by
+  // the server's network address) there is no second name, so they load from the
+  // board's own origin; loading two at a time keeps that workable.
+  const other = { localhost: '127.0.0.1', '127.0.0.1': 'localhost' }[location.hostname];
+  const APP = other ? `${location.protocol}//${other}:${location.port}` : location.origin;
+  const SCREENS = [
+    ['Welcome', '/'],
+    ['Set up', '/setup'],
+    ['Pair', '/setup/pair'],
+    ['Home (demo)', '/?demo'],
+    ['Preheating', '/?demo=preheat'],
+    ['Ready', '/?demo=ready'],
+    ['Cooking, timer', '/?demo=cooking'],
+    ['Probe cook', '/?demo=probe'],
+    ['Done', '/?demo=done'],
+    ['Offline', '/?demo=offline'],
+    ['Start a cook (demo)', '/cook?mode=bake&demo'],
+    ['Settings (demo)', '/settings?demo'],
+    ['Camera (demo)', '/camera?demo'],
+  ];
+  const board = document.getElementById('board');
+  const device = document.getElementById('device');
+  const zoom = document.getElementById('zoom');
+  try { const s = JSON.parse(localStorage.getItem('phone-board') || '{}'); if (s.device) device.value = s.device; if (s.zoom) zoom.value = s.zoom; } catch {}
+
+  // Each phone loads the whole dev bundle (several MB, seconds to serve). Started all
+  // at once they queue behind the browser's six connections and none appears for a
+  // minute, so they load two at a time, the ones in view first.
+  const PARALLEL = 2;
+  let waiting = [], loading = 0, generation = 0;
+  const inView = new Set();
+  const seen = new IntersectionObserver((entries) => {
+    for (const e of entries) e.isIntersecting ? inView.add(e.target) : inView.delete(e.target);
+    pump();
+  });
+  function pump() {
+    while (loading < PARALLEL && waiting.length) {
+      const i = waiting.findIndex((f) => inView.has(f));
+      const f = waiting.splice(i >= 0 ? i : 0, 1)[0];
+      const gen = generation;
+      loading++;
+      let done = false;
+      const next = () => { if (done || gen !== generation) return; done = true; loading--; pump(); };
+      f.addEventListener('load', next, { once: true });
+      setTimeout(next, 60000);
+      f.src = f.dataset.src;
+    }
+  }
+  function queueAll() {
+    generation++;
+    loading = 0;
+    waiting = [...board.querySelectorAll('iframe')];
+    for (const f of waiting) { f.removeAttribute('src'); seen.observe(f); }
+    pump();
+  }
+
+  function render() {
+    try { localStorage.setItem('phone-board', JSON.stringify({ device: device.value, zoom: zoom.value })); } catch {}
+    const [w, h, top, bottom] = device.value.split(',').map(Number);
+    const z = Number(zoom.value), pad = 12, W = w + pad * 2, H = h + pad * 2;
+    board.innerHTML = '';
+    for (const [name, path] of SCREENS) {
+      const fig = document.createElement('figure');
+      fig.innerHTML = `
+        <figcaption><span>${name}</span><a href="${APP}${path}" target="_blank" title="Open full size">${path} ↗</a></figcaption>
+        <div class="slot" style="width:${W * z}px;height:${H * z}px">
+          <div class="phone" style="transform:scale(${z})">
+            <div class="screen" style="width:${w}px;height:${h}px">
+              ${top ? `<div class="bar" style="height:${top}px"><span>9:41</span><span>▂▄▆ ● 77%</span></div>` : ''}
+              <iframe data-src="${APP}${path}" title="${name}"></iframe>
+              ${bottom ? `<div class="nav" style="height:${bottom}px"><i></i></div>` : ''}
+            </div>
+          </div>
+        </div>`;
+      // (The app hides its own scrollbars when previewed in a frame: src/devPreview.ts.)
+      board.appendChild(fig);
+    }
+    queueAll();
+  }
+  device.onchange = zoom.onchange = render;
+  document.getElementById('reload').onclick = queueAll;
+  render();
+</script>
+</body>
+</html>
