@@ -29,6 +29,8 @@ export type Prefs = {
   modeOrder: 'oven' | 'used';
   /** Mode tiles in pages you swipe (8 to a page, Camera and Settings last), or all on one. */
   modesShown: 'pages' | 'all';
+  /** The stored shape: 2 from the 15 fps default on (older saves have none). */
+  version: number;
 };
 
 /**
@@ -37,7 +39,7 @@ export type Prefs = {
  * the camera window or Live view is open.
  */
 export const CAMERA_FPS = [1, 5, 10, 15];
-const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'pages' };
+const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'pages', version: 2 };
 
 /** Cooks started from this phone, per mode. Kept apart from the settings, so Reset keeps them. */
 export type Uses = Record<string, number>;
@@ -84,7 +86,10 @@ export function OvenProvider({ children }: { children: ReactNode }) {
       ]);
       if (pr) {
         const next = { ...DEFAULT_PREFS, ...pr };
-        // Rates from before v0.4.4's choices (0.5, 2) move to the nearest one.
+        // Saves from before the 15 fps default carry the old default (1), stored with
+        // everything else: start them at 15 too. Not released then, so no one chose it.
+        if ((pr.version ?? 1) < 2) { next.cameraFps = DEFAULT_PREFS.cameraFps; next.version = 2; save(PREFS_KEY, next); }
+        // Anything off the list moves to the nearest choice.
         if (!CAMERA_FPS.includes(next.cameraFps)) next.cameraFps = CAMERA_FPS.reduce((a, b) => (Math.abs(b - next.cameraFps) < Math.abs(a - next.cameraFps) ? b : a));
         setPrefs(next);
       }
