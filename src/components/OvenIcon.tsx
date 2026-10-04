@@ -1,5 +1,6 @@
 // The oven's icon, from the Home Assistant card (july-oven-card.js, OVEN_ICONS): a set
-// of 12 in the card's line style (24 px grid, 1.75 stroke), or any "mdi:" icon.
+// in the card's line style (24 px grid, 1.75 stroke), or any "mdi:" icon. The default
+// here is the June countertop oven; the card's default (a range) is "range".
 //
 // The icon is the oven's lamp: orange with a glow while it heats, the text colour
 // while it is off, grey when offline.
@@ -11,7 +12,15 @@ import { useTheme } from '@/theme';
 type Draw = (s: object) => React.ReactNode;
 
 export const OVEN_ICONS: Record<string, [label: string, draw: Draw]> = {
-  oven: ['Oven', (s) => (<>
+  // The June countertop oven, as in the app icon: body, top bar, window with its
+  // handle at the right, two feet. (The card's own "oven" is a range; see below.)
+  oven: ['June oven', (s) => (<>
+    <Rect x={3.5} y={5.5} width={17} height={11.5} rx={2.6} {...s} />
+    <Path d="M6.5 8h11" {...s} />
+    <Rect x={5.7} y={10} width={12.6} height={4.8} rx={1.1} {...s} />
+    <Path d="M15.6 11.6v1.6M6.4 19.2h1.8M15.8 19.2h1.8" {...s} />
+  </>)],
+  range: ['Range', (s) => (<>
     <Rect x={3.5} y={4} width={17} height={16} rx={2.5} {...s} />
     <Path d="M3.5 8.5h17M7 6.3h1.5M11 6.3h1.5" {...s} />
     <Rect x={7} y={11.5} width={10} height={5.5} rx={1.2} {...s} />
