@@ -12,7 +12,6 @@ const TUCK_MS = 5000;
 
 export type OvenButtonProps = {
   name: string;
-  icon: string;
   lamp: Lamp;
   /** The lamp's word for screen readers and the menu: "off", "preheating", "offline"… */
   state: string;
@@ -21,7 +20,7 @@ export type OvenButtonProps = {
   size?: number;
 };
 
-export function OvenButton({ name, icon, lamp, state, tuck, size = 22 }: OvenButtonProps) {
+export function OvenButton({ name, lamp, state, tuck, size = 22 }: OvenButtonProps) {
   const { c, f } = useTheme();
   const [tucked, setTucked] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -61,7 +60,7 @@ export function OvenButton({ name, icon, lamp, state, tuck, size = 22 }: OvenBut
         hitSlop={4}
         style={({ pressed }) => [styles.button, { backgroundColor: pressed || menu ? c.surfaceSunken : 'transparent' }]}
       >
-        <OvenLamp icon={icon} lamp={lamp} size={Math.round(size * 1.2)} />
+        <OvenLamp lamp={lamp} size={Math.round(size * 1.2)} />
         <Animated.View
           style={{
             flexShrink: 1, minWidth: 0, overflow: 'hidden', opacity: shown,
@@ -95,7 +94,7 @@ export function OvenButton({ name, icon, lamp, state, tuck, size = 22 }: OvenBut
               onPress={() => setMenu(null)}
               style={({ pressed }) => [styles.item, pressed && { backgroundColor: c.surfaceSunken }]}
             >
-              <OvenLamp icon={icon} lamp={lamp} size={22} />
+              <OvenLamp lamp={lamp} size={22} />
               <Text numberOfLines={1} style={{ flex: 1, fontFamily: f.sansMedium, fontSize: 17, color: c.ink }}>{name}</Text>
               <Text style={{ fontFamily: f.sansStrong, fontSize: 12, letterSpacing: 0.84, textTransform: 'uppercase', color: lamp === 'on' ? c.ember : c.inkMuted }}>{state}</Text>
               <Icon name="check-circle" size={18} color={c.inkMuted} />

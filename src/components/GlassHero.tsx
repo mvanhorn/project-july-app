@@ -195,7 +195,7 @@ export function GlassHero(p: Props) {
       <View style={{ padding: PX }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[2] }}>
           <View style={{ flex: 1, minWidth: 0, marginTop: -6 }}>
-            <OvenButton name={p.name} icon={prefs.icon} lamp="off" state="off" tuck={prefs.hideName} size={w < 400 ? 18 : 22} />
+            <OvenButton name={p.name} lamp="off" state="off" tuck={prefs.hideName} size={w < 400 ? 18 : 22} />
           </View>
           <View style={{ alignItems: 'center' }} accessible accessibilityLabel={`Time ${clock}, ${date}`}>
             <Text style={{ fontFamily: f.number, fontSize: clockSize, lineHeight: clockSize * 0.95, marginTop: -clockSize * 0.15, fontVariant: ['tabular-nums'], color: c.ink }}>{clock}</Text>
@@ -264,7 +264,7 @@ export function GlassHero(p: Props) {
     <View style={{ paddingHorizontal: PX, paddingTop: 14, paddingBottom: PX, gap: space[3] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: GAP }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <OvenButton name={p.name} icon={prefs.icon} lamp={m.lamp} state={m.state} tuck={false} />
+          <OvenButton name={p.name} lamp={m.lamp} state={m.state} tuck={false} />
         </View>
         {m.action === 'stop' ? (
           <Pressable

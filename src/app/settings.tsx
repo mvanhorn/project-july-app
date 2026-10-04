@@ -7,10 +7,9 @@ import { probe, urls, type ProbeResult } from '@/api/endpoint';
 import { PAGE_TILES } from '@/api/modes';
 import { NO_TRUST } from '@/api/trust';
 import { CertificatePanel } from '@/components/CertificatePanel';
-import { Button, Card, Divider, Field, Notice, Row, Screen, SectionLabel, Segmented, T, confirm } from '@/components/ui';
+import { Button, Card, Divider, Notice, Row, Screen, SectionLabel, Segmented, T, confirm } from '@/components/ui';
 import { CAMERA_FPS, useOven, useOvenName } from '@/state/oven';
 import { Icon } from '@/components/Icon';
-import { OVEN_ICONS, OvenIcon, mdiName } from '@/components/OvenIcon';
 import { space, THEMES, useTheme, useThemeSettings, type ThemeId } from '@/theme';
 
 export default function Settings() {
@@ -149,22 +148,7 @@ function ConnectionSettings() {
 
 /** The Home Assistant card's own settings, for the glass home screen. */
 function HomeScreenSettings() {
-  const { c, r } = useTheme();
   const { prefs, setPref, resetPrefs } = useOven();
-  const name = useOvenName();
-  const mdi = prefs.icon.startsWith('mdi:') ? prefs.icon : '';
-  const [typed, setTyped] = useState<string | null>(null);
-  const [iconError, setIconError] = useState<string | null>(null);
-
-  function commitIcon() {
-    if (typed === null) return;
-    const v = typed.trim().toLowerCase();
-    setTyped(null);
-    if (!v) { setIconError(null); setPref('icon', 'oven'); return; }
-    const full = v.startsWith('mdi:') ? v : `mdi:${v}`;
-    if (mdiName(full)) { setIconError(null); setPref('icon', full); }
-    else setIconError(`${full} isn't in the Material Design icon set.`);
-  }
 
   return (
     <>
@@ -207,44 +191,7 @@ function HomeScreenSettings() {
         />
       </View>
 
-      <View style={{ gap: space[3] }}>
-        <SectionLabel>Oven icon</SectionLabel>
-        <View accessibilityRole="radiogroup" accessibilityLabel={`Icon for ${name}`} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-          {Object.entries(OVEN_ICONS).map(([id, [label]]) => {
-            const on = prefs.icon === id;
-            return (
-              <Pressable
-                key={id}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityLabel={label}
-                onPress={() => { setIconError(null); setPref('icon', id); }}
-                style={({ pressed }) => [styles.icon, {
-                  borderRadius: r.sm, borderColor: on ? c.ember : c.lineStrong, borderWidth: on ? 1.5 : 1,
-                  backgroundColor: on ? c.emberSoft : pressed ? c.surfaceSunken : 'transparent',
-                }]}
-              >
-                <OvenIcon icon={id} size={24} color={c.ink} />
-              </Pressable>
-            );
-          })}
-        </View>
-        <Field
-          label="Or any Material Design icon"
-          placeholder="mdi:stove"
-          value={typed ?? mdi}
-          onChangeText={setTyped}
-          onBlur={commitIcon}
-          onSubmitEditing={commitIcon}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
-          error={iconError ?? undefined}
-          hint={mdi ? undefined : 'Such as mdi:stove or mdi:silverware-fork-knife.'}
-        />
-      </View>
-
-      <Button variant="quiet" onPress={() => { setTyped(null); setIconError(null); resetPrefs(); }}>Reset the home screen</Button>
+      <Button variant="quiet" onPress={resetPrefs}>Reset the home screen</Button>
     </>
   );
 }
@@ -306,5 +253,4 @@ function ThemePicker() {
 const styles = StyleSheet.create({
   choice: { flex: 1, padding: space[3], gap: space[2] },
   swatch: { padding: space[3], gap: 4 },
-  icon: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
 });

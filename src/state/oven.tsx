@@ -15,8 +15,8 @@ const TRUST_KEY = 'july.trust.v1';
 
 /**
  * Display choices. The home screen ones follow the Home Assistant card's own Settings
- * (july-oven-card.js): camera frame rate, the name tucking into the icon, the clock,
- * the mode order and the oven's icon.
+ * (july-oven-card.js): camera frame rate, the name tucking into the icon, the clock
+ * and the mode order. (The oven's icon is not a choice here: always the June oven.)
  */
 export type Prefs = {
   unit: Unit;
@@ -29,8 +29,6 @@ export type Prefs = {
   modeOrder: 'oven' | 'used';
   /** Mode tiles in pages you swipe (8 to a page, Camera and Settings last), or all on one. */
   modesShown: 'pages' | 'all';
-  /** One of OVEN_ICONS, or any "mdi:" icon. */
-  icon: string;
 };
 
 /**
@@ -39,7 +37,7 @@ export type Prefs = {
  * the camera window or Live view is open.
  */
 export const CAMERA_FPS = [1, 5, 10, 15];
-const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'pages', icon: 'oven' };
+const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'pages' };
 
 /** Cooks started from this phone, per mode. Kept apart from the settings, so Reset keeps them. */
 export type Uses = Record<string, number>;
