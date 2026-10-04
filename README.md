@@ -14,8 +14,8 @@ Light / Dark):
   while heating) with its name and a one-tap red Stop, a big number with a status mark
   (↑ preheating, ✓ ready, flame cooking), the heat line, a 4:3 camera and +1/+5/+10
   buttons. When the oven is off it shows the home screen: the clock and glowing mode
-  tiles: the top six modes with Camera and Settings (4 × 2), and All modes for the rest
-  (or all of them, in Settings). Modes not yet started on a real oven carry a "?". The
+  tiles in pages you swipe, with page dots you can also tap: the top six modes with
+  Camera and Settings (4 × 2), then the rest (or all on one, in Settings). Modes not yet started on a real oven carry a "?". The
   name tucks into the icon after 5 s. Camera opens a floating window over the tile. Starting goes through a
   review with a slider and a typed temperature, which warns the oven must be empty and
   closes itself after 5 minutes.

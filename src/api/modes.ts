@@ -38,8 +38,8 @@ export const MODES: CookMode[] = [
 /**
  * Mode tiles on the glass home screen, in the oven's order: the Home Assistant card's
  * five (bake, roast, broil, air fry, toast) first, then the other untested ones.
- * Camera and Settings come last. By default the first TOP_MODES show (with Camera and
- * Settings, the card's 4 × 2) and All modes opens the rest.
+ * By default they are paged, as on the card: the first TOP_MODES with Camera and
+ * Settings (the card's 4 × 2), then the rest, eight to a page.
  */
 export const TOP_MODES = 6;
 export const TILE_MODES = ['bake', 'roast', 'broil', 'airfry', 'toast', 'pizzaiolo', 'reheat', 'warm', 'dehydrate', 'proof', 'slow_cook']

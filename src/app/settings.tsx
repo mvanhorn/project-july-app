@@ -192,9 +192,9 @@ function HomeScreenSettings() {
           label="Cook modes on the home screen"
           value={prefs.modesShown}
           onChange={(v) => setPref('modesShown', v)}
-          options={[{ value: 'top', label: `Top ${TOP_MODES}` }, { value: 'all', label: `All ${TILE_MODES.length}` }]}
+          options={[{ value: 'pages', label: 'Pages' }, { value: 'all', label: 'All on one' }]}
         />
-        <T v="small" muted>{`With Top ${TOP_MODES}, the home screen shows the first ${TOP_MODES} in this order, and All modes opens the rest.`}</T>
+        <T v="small" muted>{`Pages: the first ${TOP_MODES} in this order with Camera and Settings, then swipe for the other ${TILE_MODES.length - TOP_MODES}.`}</T>
       </View>
 
       <View style={{ gap: space[3] }}>

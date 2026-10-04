@@ -11,8 +11,8 @@
 // The icon is the oven's lamp; on the home screen the name tucks into it after 5 s.
 // The camera opens a floating window over the card. Every margin is the card's
 // padding, measured to the ink.
-import { useCallback, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Image } from 'expo-image';
 import type { OvenSnapshot } from '@/api/client';
 import { TOP_MODES, formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
@@ -116,7 +116,8 @@ export function GlassHero(p: Props) {
   const { prefs, uses } = useOven();
   const [w, setW] = useState(372);
   const [camera, setCamera] = useState(false);
-  const [allModes, setAllModes] = useState(false);
+  const [page, setPage] = useState(0);
+  const pager = useRef<ScrollView>(null);
   // Screens hidden in the stack lay out at 0 wide; keep the last real width.
   const onLayout = (e: LayoutChangeEvent) => { const lw = e.nativeEvent.layout.width; if (lw >= 200) setW(lw); };
   const closeCamera = useCallback(() => setCamera(false), []);
@@ -149,32 +150,26 @@ export function GlassHero(p: Props) {
     // Four across, reaching the card's padding on both sides (DESIGN.md: equal margins).
     const gap = Math.min(20, Math.max(10, w * 0.034));
     const tile = Math.floor(Math.min((inner - 3 * gap) / 4, 104));
-    // The top six (with Camera and Settings, the card's 4 × 2) unless all were asked for.
-    const modes = tileModes(prefs.modeOrder, uses);
-    const folds = prefs.modesShown === 'top' && modes.length > TOP_MODES;
-    const shown = folds && !allModes ? modes.slice(0, TOP_MODES) : modes;
-    const tiles: { id: string; label: string; util?: boolean; untested?: boolean }[] = [
-      ...shown.map((m) => ({ id: m.id, label: m.label, untested: m.untested })),
-      { id: 'camera', label: 'Camera', util: true },
-      { id: 'settings', label: 'Settings', util: true },
-    ];
-    const rows: (typeof tiles)[] = [];
-    for (let i = 0; i < tiles.length; i += 4) rows.push(tiles.slice(i, i + 4));
-    return shell(
-      <View style={{ padding: PX }}>
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[2] }}>
-          <View style={{ flex: 1, minWidth: 0, marginTop: -6 }}>
-            <OvenButton name={p.name} icon={prefs.icon} lamp="off" state="off" tuck={prefs.hideName} size={w < 400 ? 18 : 22} />
-          </View>
-          <View style={{ alignItems: 'center' }} accessible accessibilityLabel={`Time ${clock}, ${date}`}>
-            <Text style={{ fontFamily: f.number, fontSize: clockSize, lineHeight: clockSize * 0.95, marginTop: -clockSize * 0.15, fontVariant: ['tabular-nums'], color: c.ink }}>{clock}</Text>
-            <Text style={{ fontFamily: f.sans, fontSize: 14, lineHeight: 18, color: c.inkMuted, marginTop: 4 }}>{date}</Text>
-          </View>
-          <View style={{ flex: 1 }} />
-        </View>
-        <View style={{ marginTop: space[8], gap: 10 }}>
+    // Paged as on the card: the top six with Camera and Settings (its 4 × 2), so those
+    // two stay one tap away, then the rest eight to a page. Or all on one, if asked.
+    type Tile = { id: string; label: string; util?: boolean; untested?: boolean };
+    const modes: Tile[] = tileModes(prefs.modeOrder, uses).map((m) => ({ id: m.id, label: m.label, untested: m.untested }));
+    const util: Tile[] = [{ id: 'camera', label: 'Camera', util: true }, { id: 'settings', label: 'Settings', util: true }];
+    const pages: Tile[][] = [];
+    if (prefs.modesShown === 'all' || modes.length <= TOP_MODES) pages.push([...modes, ...util]);
+    else {
+      pages.push([...modes.slice(0, TOP_MODES), ...util]);
+      for (let i = TOP_MODES; i < modes.length; i += 8) pages.push(modes.slice(i, i + 8));
+    }
+    const grid = (tiles: Tile[]) => {
+      const rows: Tile[][] = [];
+      for (let i = 0; i < tiles.length; i += 4) rows.push(tiles.slice(i, i + 4));
+      // Every page keeps the first page's two rows, so swiping never changes the card's height.
+      while (pages.length > 1 && rows.length < 2) rows.push([]);
+      return (
+        <View style={{ gap: 10 }}>
           {rows.map((row, i) => (
-            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', minHeight: row.length ? undefined : tile + 27 }}>
               {row.map((t) => (
                 <ModeTile
                   key={t.id}
@@ -189,21 +184,62 @@ export function GlassHero(p: Props) {
                 />
               ))}
               {/* Keep a short last row on the grid. */}
-              {Array.from({ length: 4 - row.length }, (_, k) => <View key={`pad${k}`} style={{ width: tile }} />)}
+              {row.length ? Array.from({ length: 4 - row.length }, (_, k) => <View key={`pad${k}`} style={{ width: tile }} />) : null}
             </View>
           ))}
         </View>
-        {folds ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded: allModes }}
-            onPress={() => setAllModes((a) => !a)}
-            style={({ pressed }) => [styles.more, { borderRadius: r.md, backgroundColor: pressed ? c.surfaceSunken : 'transparent' }]}
-          >
-            <Text style={{ fontFamily: f.sansMedium, fontSize: 16, color: c.inkMuted }}>{allModes ? 'Fewer modes' : `All ${modes.length} modes`}</Text>
-            <Icon name={allModes ? 'chevron-up' : 'chevron-down'} size={20} color={c.inkMuted} />
-          </Pressable>
-        ) : null}
+      );
+    };
+    const goTo = (i: number) => { pager.current?.scrollTo({ x: i * w, animated: true }); setPage(i); };
+    return shell(
+      <View style={{ padding: PX }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[2] }}>
+          <View style={{ flex: 1, minWidth: 0, marginTop: -6 }}>
+            <OvenButton name={p.name} icon={prefs.icon} lamp="off" state="off" tuck={prefs.hideName} size={w < 400 ? 18 : 22} />
+          </View>
+          <View style={{ alignItems: 'center' }} accessible accessibilityLabel={`Time ${clock}, ${date}`}>
+            <Text style={{ fontFamily: f.number, fontSize: clockSize, lineHeight: clockSize * 0.95, marginTop: -clockSize * 0.15, fontVariant: ['tabular-nums'], color: c.ink }}>{clock}</Text>
+            <Text style={{ fontFamily: f.sans, fontSize: 14, lineHeight: 18, color: c.inkMuted, marginTop: 4 }}>{date}</Text>
+          </View>
+          <View style={{ flex: 1 }} />
+        </View>
+        {pages.length === 1 ? (
+          <View style={{ marginTop: space[8] }}>{grid(pages[0])}</View>
+        ) : (
+          <>
+            <ScrollView
+              ref={pager}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={32}
+              onScroll={(e) => { const i = Math.round(e.nativeEvent.contentOffset.x / w); setPage((pg) => (pg === i ? pg : i)); }}
+              style={{ marginTop: space[8], marginHorizontal: -PX }}
+              accessibilityLabel={`Cook modes, ${pages.length} pages`}
+            >
+              {pages.map((pg, i) => (
+                <View key={i} style={{ width: w, paddingHorizontal: PX }} accessibilityLabel={`Page ${i + 1} of ${pages.length}`}>
+                  {grid(pg)}
+                </View>
+              ))}
+            </ScrollView>
+            {/* Swiping is never the only way: each dot is a 48 px button. */}
+            <View style={styles.dots}>
+              {pages.map((_, i) => (
+                <Pressable
+                  key={i}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show page ${i + 1} of ${pages.length}`}
+                  accessibilityState={{ selected: i === page }}
+                  onPress={() => goTo(i)}
+                  style={styles.dot}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.ink, opacity: i === page ? 1 : 0.28 }} />
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
       </View>,
     );
   }
@@ -320,5 +356,6 @@ const styles = StyleSheet.create({
   action: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   cam: { width: '100%', aspectRatio: 4 / 3, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   camSheen: { position: 'absolute', left: 1, right: 1, top: 1, height: 2, borderTopWidth: 1 },
-  more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, marginTop: space[2], marginBottom: -space[2] },
+  dots: { flexDirection: 'row', justifyContent: 'center', height: 48, marginBottom: -space[3] },
+  dot: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
 });
