@@ -62,7 +62,7 @@ export async function probe(host: string): Promise<ProbeResult> {
   try {
     const status = await get({ host, secure: false });
     if (status.server !== 'june-local') {
-      return { ok: false, reason: 'not-july', message: 'Something answered at that address, but it is not a July Oven server.' };
+      return { ok: false, reason: 'not-july', message: 'Something answered at that address, but it is not a june-local server.' };
     }
     return { ok: true, secure: false, status };
   } catch {

@@ -7,15 +7,23 @@ import { useFonts } from 'expo-font';
 import { Fraunces_500Medium, Fraunces_600SemiBold } from '@expo-google-fonts/fraunces';
 import { PublicSans_400Regular, PublicSans_600SemiBold } from '@expo-google-fonts/public-sans';
 import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
+import {
+  BarlowSemiCondensed_400Regular, BarlowSemiCondensed_500Medium, BarlowSemiCondensed_600SemiBold,
+} from '@expo-google-fonts/barlow-semi-condensed';
+import { BarlowCondensed_300Light, BarlowCondensed_400Regular } from '@expo-google-fonts/barlow-condensed';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ThemeProvider, useTheme, fonts } from '@/theme';
+import { ThemeProvider, useTheme } from '@/theme';
 import { OvenProvider } from '@/state/oven';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
+    // July
     Fraunces_500Medium, Fraunces_600SemiBold, PublicSans_400Regular, PublicSans_600SemiBold, IBMPlexMono_400Regular,
+    // Still Glass (the Home Assistant card's stand-ins for June's DIN Next)
+    BarlowSemiCondensed_400Regular, BarlowSemiCondensed_500Medium, BarlowSemiCondensed_600SemiBold,
+    BarlowCondensed_300Light, BarlowCondensed_400Regular,
   });
   useEffect(() => {
     if (loaded || error) SplashScreen.hideAsync().catch(() => {});
@@ -34,7 +42,7 @@ export default function RootLayout() {
 }
 
 function Screens() {
-  const { c, name } = useTheme();
+  const { c, f, name } = useTheme();
   return (
     <>
       <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
@@ -43,7 +51,7 @@ function Screens() {
           headerStyle: { backgroundColor: c.surface },
           headerShadowVisible: false,
           headerTintColor: c.ember,
-          headerTitleStyle: { fontFamily: fonts.sansStrong, fontSize: 18, color: c.ink },
+          headerTitleStyle: { fontFamily: f.sansStrong, fontSize: 18, color: c.ink },
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: c.surface },
         }}

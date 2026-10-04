@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "July Oven",
+    "name": "Project July",
     "slug": "project-july",
     "scheme": "julyoven",
     "version": "1.0.0",
@@ -12,7 +12,7 @@
       "bundleIdentifier": "org.projectjuly.oven",
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocalNetworkUsageDescription": "July Oven talks to your oven over your home Wi-Fi.",
+        "NSLocalNetworkUsageDescription": "Project July talks to your June oven over your home Wi-Fi.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }

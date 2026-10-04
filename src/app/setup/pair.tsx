@@ -8,10 +8,10 @@ import { Icon } from '@/components/Icon';
 import { useNow } from '@/components/OvenHero';
 import { Button, Card, Notice, ProgressBar, Screen, SetupStep, T } from '@/components/ui';
 import { useOven } from '@/state/oven';
-import { fonts, radius, space, type, useTheme } from '@/theme';
+import { space, useTheme } from '@/theme';
 
 export default function Pair() {
-  const { c } = useTheme();
+  const { c, f, t, r, look } = useTheme();
   const { completePairing } = useOven();
   const params = useLocalSearchParams<{ host: string; secure: string; name: string }>();
   const [ready, setReady] = useState(false);
@@ -44,7 +44,7 @@ export default function Pair() {
     return (
       <Screen footer={<Button variant="primary" onPress={begin}>The oven is ready — show the code</Button>}>
         <View style={{ gap: space[2] }}>
-          <Text accessibilityRole="header" style={[type.title, { color: c.ink }]}>Get the oven ready</Text>
+          <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>Get the oven ready</Text>
           <T v="lead" muted>The code only lasts a minute or two, so open the oven’s Connect screen first.</T>
         </View>
         <View style={{ gap: space[5] }}>
@@ -63,7 +63,7 @@ export default function Pair() {
           <View style={[styles.doneDisc, { backgroundColor: c.readySoft }]}>
             <Icon name="check-circle" size={56} color={c.ready} />
           </View>
-          <Text accessibilityRole="header" style={[type.title, { color: c.ink, textAlign: 'center' }]}>Setup complete</Text>
+          <Text accessibilityRole="header" style={[t.title, { color: c.ink, textAlign: 'center' }]}>Setup complete</Text>
           <T v="lead" muted style={{ textAlign: 'center' }}>
             {`This phone is paired with ${step.paired.oven.name}. Only paired phones can control it.`}
           </T>
@@ -75,7 +75,7 @@ export default function Pair() {
   if (step.step === 'failed') {
     return (
       <Screen footer={<Button variant="primary" onPress={begin}>Get a new code</Button>}>
-        <Text accessibilityRole="header" style={[type.title, { color: c.ink }]}>Pairing didn’t finish</Text>
+        <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>Pairing didn’t finish</Text>
         <Notice tone="warning" title="What happened">{step.message}</Notice>
         <T muted>Check the oven is still on its Connect screen, then get a new code.</T>
       </Screen>
@@ -88,7 +88,7 @@ export default function Pair() {
   return (
     <Screen>
       <View style={{ gap: space[2] }}>
-        <Text accessibilityRole="header" style={[type.title, { color: c.ink }]}>
+        <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>
           {exchanging ? 'Pairing…' : 'Enter this code on the oven'}
         </Text>
         <T v="lead" muted>{exchanging ? 'The oven has the code. Exchanging keys — keep the oven on this screen.' : 'Type all eight digits on the oven’s Connect screen.'}</T>
@@ -105,8 +105,8 @@ export default function Pair() {
               {[code.slice(0, 4), code.slice(4)].map((group, gi) => (
                 <View key={gi} style={{ flexDirection: 'row', gap: 6 }}>
                   {group.split('').map((d, i) => (
-                    <View key={i} style={[styles.digit, { backgroundColor: c.surfaceSunken, borderColor: c.line }]}>
-                      <Text style={[styles.digitText, { color: c.ink }]}>{d}</Text>
+                    <View key={i} style={[styles.digit, { borderRadius: r.sm, backgroundColor: c.surfaceSunken, borderColor: c.line }]}>
+                      <Text style={[styles.digitText, { fontFamily: look.glassCards ? f.number : f.mono, fontSize: look.glassCards ? 38 : 30, color: c.ink }]}>{d}</Text>
                     </View>
                   ))}
                 </View>
@@ -136,7 +136,7 @@ export default function Pair() {
 }
 
 const styles = StyleSheet.create({
-  digit: { width: 36, height: 56, borderRadius: radius.sm, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  digitText: { fontFamily: fonts.mono, fontSize: 30 },
+  digit: { width: 36, height: 56, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  digitText: { fontSize: 30 },
   doneDisc: { width: 112, height: 112, borderRadius: 56, alignItems: 'center', justifyContent: 'center' },
 });

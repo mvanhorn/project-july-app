@@ -1,4 +1,5 @@
-// React Native ports of the July Oven components (design-system/components).
+// Shared components. Colour, type, radii and a few component choices come from
+// the active theme (src/theme/themes.ts): the July design system or Still Glass.
 import { forwardRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
@@ -6,24 +7,21 @@ import {
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radius, space, type, useTheme } from '@/theme';
+import { space, useTheme, type TypeName } from '@/theme';
+import { GlassFill, Gradient, StatusLine, type MarkKind } from './glass';
 import { Icon, type IconName } from './Icon';
 
-export type OvenState = 'ready' | 'paired' | 'preheating' | 'cooking' | 'offline' | 'fault' | 'idle';
+export type OvenState = 'ready' | 'paired' | 'preheating' | 'cooking' | 'offline' | 'fault' | 'idle' | 'done';
 
 // --- Text ------------------------------------------------------------------
 
-type TextVariant = keyof typeof type;
 export function T({ v = 'body', muted, color, style, children, ...rest }: {
-  v?: TextVariant; muted?: boolean; color?: string; style?: TextStyle | TextStyle[];
+  v?: TypeName; muted?: boolean; color?: string; style?: TextStyle | TextStyle[];
   children: ReactNode; numberOfLines?: number; accessibilityRole?: 'header' | 'text';
 }) {
-  const { c } = useTheme();
+  const { c, t } = useTheme();
   return (
-    <Text
-      {...rest}
-      style={[type[v] as TextStyle, { color: color ?? (muted ? c.inkMuted : c.ink) }, style]}
-    >
+    <Text {...rest} style={[t[v], { color: color ?? (muted ? c.inkMuted : c.ink) }, style]}>
       {children}
     </Text>
   );
@@ -32,11 +30,15 @@ export function T({ v = 'body', muted, color, style, children, ...rest }: {
 // --- Button ----------------------------------------------------------------
 
 export function Button({ variant = 'secondary', icon, onPress, disabled, busy, children, style, accessibilityLabel }: {
-  variant?: 'primary' | 'secondary' | 'quiet'; icon?: IconName; onPress?: () => void;
+  /** `stop` is red on glass and an ordinary outlined button in July. */
+  variant?: 'primary' | 'secondary' | 'quiet' | 'stop'; icon?: IconName; onPress?: () => void;
   disabled?: boolean; busy?: boolean; children: ReactNode; style?: ViewStyle; accessibilityLabel?: string;
 }) {
-  const { c } = useTheme();
-  const fg = variant === 'primary' ? c.onEmber : variant === 'quiet' ? c.ember : c.ink;
+  const { c, t, r, look } = useTheme();
+  const gradient = variant === 'primary' && look.primary === 'gradient';
+  const redStop = variant === 'stop' && look.stop === 'red';
+  const kind = variant === 'stop' && !redStop ? 'secondary' : variant;
+  const fg = gradient ? c.onGo : redStop ? c.onStop : kind === 'primary' ? c.onEmber : kind === 'quiet' ? c.ember : c.ink;
   return (
     <Pressable
       accessibilityRole="button"
@@ -44,21 +46,24 @@ export function Button({ variant = 'secondary', icon, onPress, disabled, busy, c
       accessibilityState={{ disabled: !!disabled, busy: !!busy }}
       disabled={disabled || busy}
       onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        Haptics.impactAsync(variant === 'stop' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         onPress?.();
       }}
       style={({ pressed }) => [
         styles.btn,
-        variant === 'primary' && { backgroundColor: c.ember, borderColor: c.ember },
-        variant === 'secondary' && { backgroundColor: pressed ? c.surfaceSunken : c.surfaceRaised, borderColor: c.lineStrong },
-        variant === 'quiet' && { backgroundColor: pressed ? c.emberSoft : 'transparent', borderColor: 'transparent', paddingHorizontal: space[3] },
-        variant === 'primary' && pressed && { opacity: 0.9 },
+        { minHeight: look.buttonHeight, borderRadius: gradient ? r.lg : r.md },
+        kind === 'primary' && { backgroundColor: c.ember, borderColor: gradient ? 'transparent' : c.ember },
+        redStop && { backgroundColor: c.stop, borderColor: c.stop },
+        kind === 'secondary' && { backgroundColor: pressed ? c.surfaceSunken : look.glassCards ? 'transparent' : c.surfaceRaised, borderColor: c.lineStrong },
+        kind === 'quiet' && { backgroundColor: pressed ? c.emberSoft : 'transparent', borderColor: 'transparent', paddingHorizontal: space[3] },
+        (kind === 'primary' || redStop) && pressed && { opacity: 0.88 },
         (disabled || busy) && { opacity: 0.5 },
         style,
       ]}
     >
+      {gradient ? <Gradient colors={[c.go1, c.go2]} horizontal /> : null}
       {busy ? <ActivityIndicator color={fg} /> : icon ? <Icon name={icon} size={20} color={fg} /> : null}
-      <Text style={[type.button, { color: fg }]}>{children}</Text>
+      <Text style={[t.button, { color: fg }]}>{children}</Text>
     </Pressable>
   );
 }
@@ -67,21 +72,28 @@ export function Button({ variant = 'secondary', icon, onPress, disabled, busy, c
 
 const PILL_LABEL: Record<OvenState, string> = {
   ready: 'Ready', paired: 'Paired', preheating: 'Preheating', cooking: 'Cooking',
-  offline: 'Offline', fault: 'Needs attention', idle: 'Idle',
+  offline: 'Offline', fault: 'Needs attention', idle: 'Idle', done: 'Done',
 };
 
-export function StatusPill({ state, children }: { state: OvenState; children?: ReactNode }) {
-  const { c } = useTheme();
+const STATE_MARK: Record<OvenState, MarkKind> = {
+  ready: 'ready', paired: 'ready', preheating: 'preheat', cooking: 'cooking',
+  offline: 'offline', fault: 'warn', idle: 'off', done: 'done',
+};
+
+export function StatusPill({ state, children }: { state: OvenState; children?: string }) {
+  const { c, f, look } = useTheme();
+  const label = children ?? PILL_LABEL[state];
+  if (look.status === 'mark') return <StatusLine kind={STATE_MARK[state]} word={label} />;
   const [bg, fg] =
-    state === 'ready' || state === 'paired' ? [c.readySoft, c.ready]
+    state === 'ready' || state === 'paired' || state === 'done' ? [c.readySoft, c.ready]
     : state === 'preheating' ? [c.heatSoft, c.heat]
     : state === 'cooking' ? [c.emberSoft, c.ember]
     : state === 'fault' ? [c.faultSoft, c.fault]
     : [c.surfaceSunken, c.inkMuted];
   return (
-    <View style={[styles.pill, { backgroundColor: bg }]} accessibilityRole="text" accessibilityLabel={`Status: ${children ?? PILL_LABEL[state]}`}>
+    <View style={[styles.pill, { backgroundColor: bg }]} accessibilityRole="text" accessibilityLabel={`Status: ${label}`}>
       <View style={[styles.pillDot, { backgroundColor: fg }]} />
-      <Text style={{ fontFamily: type.bodyStrong.fontFamily, fontSize: 15, color: fg }}>{children ?? PILL_LABEL[state]}</Text>
+      <Text style={{ fontFamily: f.sansStrong, fontSize: 15, color: fg }}>{label}</Text>
     </View>
   );
 }
@@ -89,21 +101,29 @@ export function StatusPill({ state, children }: { state: OvenState; children?: R
 // --- Card / Notice / SetupStep --------------------------------------------
 
 export function Card({ children, style, padded = true }: { children: ReactNode; style?: ViewStyle; padded?: boolean }) {
-  const { c, shadowSm } = useTheme();
+  const { c, r, look, shadowSm } = useTheme();
   return (
-    <View style={[styles.card, shadowSm, { backgroundColor: c.surfaceRaised, borderColor: c.line }, padded && { padding: space[5] }, style]}>
+    <View
+      style={[
+        { borderRadius: r.lg, borderWidth: 1, borderColor: c.line, backgroundColor: c.surfaceRaised },
+        look.glassCards ? { overflow: 'hidden' } : shadowSm,
+        padded && { padding: space[5] },
+        style,
+      ]}
+    >
+      {look.glassCards ? <GlassFill /> : null}
       {children}
     </View>
   );
 }
 
 export function Notice({ tone = 'info', title, children }: { tone?: 'info' | 'success' | 'warning'; title?: ReactNode; children?: ReactNode }) {
-  const { c } = useTheme();
+  const { c, r } = useTheme();
   const bg = tone === 'success' ? c.readySoft : tone === 'warning' ? c.faultSoft : c.surfaceSunken;
   const mark = tone === 'success' ? c.ready : tone === 'warning' ? c.fault : c.inkMuted;
   return (
     <View
-      style={[styles.notice, { backgroundColor: bg, borderColor: tone === 'info' ? c.line : 'transparent' }]}
+      style={[styles.notice, { borderRadius: r.md, backgroundColor: bg, borderColor: tone === 'info' ? c.line : 'transparent' }]}
       accessibilityLiveRegion={tone === 'warning' ? 'assertive' : 'none'}
     >
       <Icon name={tone === 'success' ? 'check-circle' : tone === 'warning' ? 'alert' : 'house'} color={mark} />
@@ -116,11 +136,11 @@ export function Notice({ tone = 'info', title, children }: { tone?: 'info' | 'su
 }
 
 export function SetupStep({ n, title, children, done }: { n: number; title: ReactNode; children?: ReactNode; done?: boolean }) {
-  const { c } = useTheme();
+  const { c, t } = useTheme();
   return (
     <View style={{ flexDirection: 'row', gap: space[4], alignItems: 'flex-start' }}>
       <View style={[styles.stepNum, { backgroundColor: done ? c.readySoft : c.emberSoft }]}>
-        {done ? <Icon name="check-circle" size={22} color={c.ready} /> : <Text style={[type.button, { color: c.ember }]}>{n}</Text>}
+        {done ? <Icon name="check-circle" size={22} color={c.ready} /> : <Text style={[t.button, { color: c.ember }]}>{n}</Text>}
       </View>
       <View style={{ flex: 1, gap: space[1], paddingTop: 6 }}>
         <T v="bodyStrong">{title}</T>
@@ -134,11 +154,11 @@ export function SetupStep({ n, title, children, done }: { n: number; title: Reac
 
 export const Field = forwardRef<TextInput, TextInputProps & { label: string; hint?: ReactNode; code?: boolean; error?: string }>(
   function Field({ label, hint, code, error, style, ...rest }, ref) {
-    const { c } = useTheme();
+    const { c, f, r } = useTheme();
     const [focused, setFocused] = useState(false);
     return (
       <View style={{ gap: space[2] }}>
-        <Text style={{ fontFamily: type.bodyStrong.fontFamily, fontSize: 15, color: c.ink }}>{label}</Text>
+        <Text style={{ fontFamily: f.sansStrong, fontSize: 15, color: c.ink }}>{label}</Text>
         <TextInput
           ref={ref}
           accessibilityLabel={label}
@@ -148,9 +168,9 @@ export const Field = forwardRef<TextInput, TextInputProps & { label: string; hin
           {...rest}
           style={[
             styles.input,
-            { color: c.ink, backgroundColor: c.surfaceRaised, borderColor: error ? c.fault : focused ? c.ember : c.lineStrong },
+            { fontFamily: f.sans, borderRadius: r.sm, color: c.ink, backgroundColor: c.surfaceRaised, borderColor: error ? c.fault : focused ? c.focus : c.lineStrong },
             focused && { borderWidth: 2.5 },
-            code && styles.inputCode,
+            code && { fontFamily: f.mono, fontSize: 28, letterSpacing: 8, textAlign: 'center', minHeight: 64 },
             style,
           ]}
         />
@@ -187,25 +207,23 @@ export function Divider() {
 
 const styles = StyleSheet.create({
   btn: {
-    minHeight: 56, borderRadius: radius.md, borderWidth: 1.5, paddingHorizontal: space[6],
+    borderWidth: 1.5, paddingHorizontal: space[6], overflow: 'hidden',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space[2],
   },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: space[2], alignSelf: 'flex-start',
-    minHeight: 32, paddingLeft: space[3], paddingRight: space[4], borderRadius: radius.full,
+    minHeight: 32, paddingLeft: space[3], paddingRight: space[4], borderRadius: 9999,
   },
-  pillDot: { width: 10, height: 10, borderRadius: radius.full },
-  card: { borderRadius: radius.lg, borderWidth: 1 },
-  notice: { flexDirection: 'row', gap: space[3], padding: space[5], borderRadius: radius.md, borderWidth: 1 },
-  stepNum: { width: 40, height: 40, borderRadius: radius.full, alignItems: 'center', justifyContent: 'center' },
-  input: { minHeight: 56, paddingHorizontal: space[4], borderRadius: radius.sm, borderWidth: 1.5, fontFamily: type.body.fontFamily, fontSize: 18 },
-  inputCode: { fontFamily: type.code.fontFamily, fontSize: 28, letterSpacing: 8, textAlign: 'center', minHeight: 64 },
+  pillDot: { width: 10, height: 10, borderRadius: 9999 },
+  notice: { flexDirection: 'row', gap: space[3], padding: space[5], borderWidth: 1 },
+  stepNum: { width: 40, height: 40, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  input: { minHeight: 56, paddingHorizontal: space[4], borderWidth: 1.5, fontSize: 18 },
   screenInner: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[5], paddingTop: space[4], gap: space[6] },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space[4], paddingHorizontal: space[5] },
   footerInner: { width: '100%', maxWidth: 560, alignSelf: 'center', gap: space[3] },
-  chip: { minHeight: 48, paddingHorizontal: space[4], borderRadius: radius.full, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  segment: { flexDirection: 'row', padding: 4, borderRadius: radius.md, borderWidth: 1, gap: 4 },
-  segmentItem: { flex: 1, minHeight: 48, borderRadius: radius.sm, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  chip: { minHeight: 48, paddingHorizontal: space[4], borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  segment: { flexDirection: 'row', padding: 4, borderWidth: 1, gap: 4 },
+  segmentItem: { flex: 1, minHeight: 48, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[5], minHeight: 56 },
 });
 
@@ -236,7 +254,7 @@ export function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 export function Chip({ selected, onPress, children, accessibilityLabel }: { selected?: boolean; onPress: () => void; children: ReactNode; accessibilityLabel?: string }) {
-  const { c } = useTheme();
+  const { c, f, r, look } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -245,19 +263,20 @@ export function Chip({ selected, onPress, children, accessibilityLabel }: { sele
       onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
       style={({ pressed }) => [
         styles.chip,
-        { borderColor: selected ? c.ember : c.lineStrong, backgroundColor: selected ? c.emberSoft : pressed ? c.surfaceSunken : c.surfaceRaised },
+        { borderRadius: look.glassCards ? r.sm : 9999 },
+        { borderColor: selected ? c.ember : c.lineStrong, backgroundColor: selected ? c.emberSoft : pressed ? c.surfaceSunken : look.glassCards ? 'transparent' : c.surfaceRaised },
         selected && { borderWidth: 2 },
       ]}
     >
-      <Text style={[type.button, { fontSize: 16, color: selected ? c.ember : c.ink }]}>{children}</Text>
+      <Text style={{ fontFamily: look.glassCards ? f.sansMedium : f.sansStrong, fontSize: 16, lineHeight: 22, fontVariant: ['tabular-nums'], color: selected ? c.ember : c.ink }}>{children}</Text>
     </Pressable>
   );
 }
 
 export function Segmented<V extends string>({ value, options, onChange, label }: { value: V; options: { value: V; label: string }[]; onChange: (v: V) => void; label: string }) {
-  const { c } = useTheme();
+  const { c, t, r } = useTheme();
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.segment, { backgroundColor: c.surfaceSunken, borderColor: c.line }]}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.segment, { borderRadius: r.md, backgroundColor: c.surfaceSunken, borderColor: c.line }]}>
       {options.map((o) => {
         const on = o.value === value;
         return (
@@ -266,9 +285,9 @@ export function Segmented<V extends string>({ value, options, onChange, label }:
             accessibilityRole="radio"
             accessibilityState={{ checked: on }}
             onPress={() => { Haptics.selectionAsync().catch(() => {}); onChange(o.value); }}
-            style={[styles.segmentItem, on && { backgroundColor: c.surfaceRaised, borderColor: c.lineStrong }]}
+            style={[styles.segmentItem, { borderRadius: r.sm }, on && { backgroundColor: c.surfaceRaised, borderColor: c.lineStrong }]}
           >
-            <Text style={[type.button, { fontSize: 16, color: on ? c.ink : c.inkMuted }]}>{o.label}</Text>
+            <Text style={[t.button, { fontSize: 16, color: on ? c.ink : c.inkMuted }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -277,7 +296,7 @@ export function Segmented<V extends string>({ value, options, onChange, label }:
 }
 
 export function RoundButton({ icon, onPress, label, disabled, size = 56 }: { icon: IconName; onPress: () => void; label: string; disabled?: boolean; size?: number }) {
-  const { c } = useTheme();
+  const { c, look } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -287,7 +306,7 @@ export function RoundButton({ icon, onPress, label, disabled, size = 56 }: { ico
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {}); onPress(); }}
       style={({ pressed }) => [
         { width: size, height: size, borderRadius: size / 2, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-        { borderColor: c.lineStrong, backgroundColor: pressed ? c.surfaceSunken : c.surfaceRaised },
+        { borderColor: c.lineStrong, backgroundColor: pressed ? c.surfaceSunken : look.glassCards ? 'transparent' : c.surfaceRaised },
         disabled && { opacity: 0.4 },
       ]}
     >
@@ -310,16 +329,39 @@ export function IconButton({ icon, onPress, label }: { icon: IconName; onPress: 
   );
 }
 
-export function ProgressBar({ value, color }: { value: number; color: string }) {
-  const { c } = useTheme();
-  const pct = Math.max(0, Math.min(1, value)) * 100;
+export type BarKind = 'preheat' | 'heat' | 'done' | 'stale';
+
+/**
+ * July: a solid bar in `color`. Glass: the card's heat line, 6 px, blue to ember
+ * while preheating (the gradient spans the whole track, so it warms as it fills).
+ */
+export function ProgressBar({ value, color, kind = 'heat' }: { value: number; color: string; kind?: BarKind }) {
+  const { c, look } = useTheme();
+  const p = Math.max(0, Math.min(1, value));
+  const pct = p * 100;
+  const a11y = { accessibilityRole: 'progressbar' as const, accessibilityValue: { min: 0, max: 100, now: Math.round(pct) } };
+  if (look.bar === 'solid') {
+    return (
+      <View {...a11y} style={{ height: 8, borderRadius: 4, backgroundColor: c.surfaceSunken, overflow: 'hidden' }}>
+        <View style={{ width: `${pct}%`, height: '100%', borderRadius: 4, backgroundColor: color }} />
+      </View>
+    );
+  }
+  const fill =
+    kind === 'preheat' ? <Gradient colors={[c.cool, '#e9c24a', c.ember]} locations={[0, 0.6, 1]} horizontal style={{ width: `${100 / Math.max(p, 0.001)}%` }} />
+    : kind === 'heat' ? <Gradient colors={[c.ember, c.ember2]} horizontal />
+    : kind === 'done' ? <View style={[StyleSheet.absoluteFill, { backgroundColor: c.ready }]} />
+    : <View style={[StyleSheet.absoluteFill, { backgroundColor: c.grey, opacity: 0.6 }]} />;
   return (
-    <View
-      accessibilityRole="progressbar"
-      accessibilityValue={{ min: 0, max: 100, now: Math.round(pct) }}
-      style={{ height: 8, borderRadius: 4, backgroundColor: c.surfaceSunken, overflow: 'hidden' }}
-    >
-      <View style={{ width: `${pct}%`, height: '100%', borderRadius: 4, backgroundColor: color }} />
+    <View {...a11y} style={{ height: 6, borderRadius: 3, backgroundColor: c.line }}>
+      <View
+        style={[
+          { width: `${pct}%`, height: '100%', borderRadius: 3, overflow: 'hidden' },
+          (kind === 'preheat' || kind === 'heat') && c.glow !== 'transparent' && { shadowColor: c.ember, shadowOpacity: 0.55, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
+        ]}
+      >
+        {fill}
+      </View>
     </View>
   );
 }
@@ -334,4 +376,3 @@ export function confirm(title: string, message: string, confirmLabel: string): P
     ], { cancelable: true, onDismiss: () => resolve(false) }),
   );
 }
-

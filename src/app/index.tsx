@@ -4,11 +4,12 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OvenError } from '@/api/client';
 import { MODES, fToC, show, formatDuration } from '@/api/modes';
+import { GlassHero } from '@/components/GlassHero';
 import { Icon, JulyMark, type IconName } from '@/components/Icon';
 import { OvenHero, remainingNow, useNow } from '@/components/OvenHero';
 import { Button, Card, Chip, IconButton, Notice, RoundButton, Screen, SectionLabel, T, confirm } from '@/components/ui';
 import { useOven, useOvenName } from '@/state/oven';
-import { fonts, space, type, useTheme } from '@/theme';
+import { space, useTheme } from '@/theme';
 
 export default function Home() {
   const { ready, link } = useOven();
@@ -22,7 +23,7 @@ export default function Home() {
 // --- Welcome -----------------------------------------------------------------
 
 function Welcome() {
-  const { c } = useTheme();
+  const { c, f, t } = useTheme();
   const { startDemo } = useOven();
   const insets = useSafeAreaInsets();
   const points: [IconName, string, string][] = [
@@ -40,13 +41,19 @@ function Welcome() {
       }
     >
       <View style={{ paddingTop: insets.top + space[8], gap: space[5] }}>
-        <View style={[styles.markDisc, { backgroundColor: c.emberSoft }]}>
-          <JulyMark size={52} color={c.ember} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[4] }}>
+          <View style={[styles.markDisc, { backgroundColor: c.emberSoft }]}>
+            <JulyMark size={52} color={c.ember} />
+          </View>
+          <View accessible accessibilityLabel="Project July. June, local.">
+            <Text style={{ fontFamily: f.display, fontSize: 24, lineHeight: 30, color: c.ink }}>Project July</Text>
+            <Text style={[t.label, { color: c.ember }]}>June, local</Text>
+          </View>
         </View>
-        <Text accessibilityRole="header" style={[type.hero, { color: c.ink, fontSize: 48, lineHeight: 54 }]}>
+        <Text accessibilityRole="header" style={[t.hero, { color: c.ink, fontSize: 48, lineHeight: 54 }]}>
           Your oven keeps working.
         </Text>
-        <T v="lead" muted>July Oven connects this phone to your June oven over your home network. No cloud, no subscription.</T>
+        <T v="lead" muted>Project July connects this phone to your June oven over your home network. No cloud, no subscription.</T>
       </View>
       <View style={{ gap: space[5] }}>
         {points.map(([icon, title, body]) => (
@@ -69,7 +76,7 @@ function Welcome() {
 // --- Dashboard ---------------------------------------------------------------
 
 function Dashboard() {
-  const { c } = useTheme();
+  const { c, f, t, look } = useTheme();
   const { link, snap: s, prefs, paired } = useOven();
   const name = useOvenName();
   const insets = useSafeAreaInsets();
@@ -78,6 +85,7 @@ function Dashboard() {
   const [dismissedDone, setDismissedDone] = useState(false);
   const errTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const unit = prefs.unit;
+  const glass = look.hero === 'glass';
 
   // A new cook re-arms the "finished" notice (state adjusted during render, not in an effect).
   const [wasActive, setWasActive] = useState(s.active);
@@ -101,34 +109,43 @@ function Dashboard() {
   }
 
   const offline = s.link === 'offline' || s.ovenOnline === false;
+  const now = useNow(s.remainingMs !== null);
+  const left = remainingNow(s, now);
+  const connection = link?.demo ? 'Simulated — nothing is sent to an oven'
+    : s.link === 'connecting' ? 'Connecting on your home network…'
+    : offline ? 'Not connected'
+    : `Connected at home · ${paired?.conn.host}`;
 
   return (
     <Screen>
       <View style={[styles.topBar, { paddingTop: insets.top + space[2] }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
           <JulyMark size={28} color={c.ember} />
-          <Text style={{ fontFamily: fonts.display, fontSize: 20, color: c.ink }}>July Oven</Text>
+          <Text style={{ fontFamily: f.display, fontSize: 20, color: c.ink }}>Project July</Text>
           {link?.demo ? (
             <View style={[styles.demoTag, { backgroundColor: c.heatSoft }]}>
-              <Text style={[type.label, { color: c.heat }]}>Demo</Text>
+              <Text style={[t.label, { color: c.heat }]}>Demo</Text>
             </View>
           ) : null}
         </View>
         <IconButton icon="gear" label="Settings" onPress={() => router.push('/settings')} />
       </View>
 
-      <View style={{ gap: space[1], marginTop: -space[2] }}>
-        <Text accessibilityRole="header" style={[type.title, { color: c.ink }]}>{name}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+      {glass ? (
+        // The card carries the oven's name; only the connection line sits above it.
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: -space[3] }}>
           <Icon name={offline ? 'alert' : 'house'} size={18} color={offline ? c.fault : c.inkMuted} />
-          <T v="small" muted>
-            {link?.demo ? 'Simulated — nothing is sent to an oven'
-              : s.link === 'connecting' ? 'Connecting on your home network…'
-              : offline ? 'Not connected'
-              : `Connected at home · ${paired?.conn.host}`}
-          </T>
+          <T v="small" muted>{connection}</T>
         </View>
-      </View>
+      ) : (
+        <View style={{ gap: space[1], marginTop: -space[2] }}>
+          <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>{name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+            <Icon name={offline ? 'alert' : 'house'} size={18} color={offline ? c.fault : c.inkMuted} />
+            <T v="small" muted>{connection}</T>
+          </View>
+        </View>
+      )}
 
       {offline && !link?.demo ? (
         <Notice tone="warning" title="Can't reach the oven">
@@ -136,7 +153,25 @@ function Dashboard() {
         </Notice>
       ) : null}
 
-      <OvenHero s={s} unit={unit} demo={!!link?.demo} onCamera={() => router.push('/camera')} />
+      {glass ? (
+        <GlassHero
+          s={s}
+          unit={unit}
+          demo={!!link?.demo}
+          name={name}
+          onCamera={() => router.push('/camera')}
+          // Stop is one tap and never confirmed (DESIGN.md, "The rules every state follows").
+          onStop={() => run('cancel', () => link!.cancel())}
+          stopping={busy === 'cancel'}
+          onAddMinutes={(min) => run('timer', () => link!.setTimer((left ?? 0) + min * 60_000))}
+          onMode={(mode) => router.push({ pathname: '/cook', params: { mode } })}
+          onMore={() => router.push('/cook')}
+          showDone={!dismissedDone}
+          onDismissDone={() => setDismissedDone(true)}
+        />
+      ) : (
+        <OvenHero s={s} unit={unit} demo={!!link?.demo} onCamera={() => router.push('/camera')} />
+      )}
 
       {error ? <Notice tone="warning" title="That didn't work">{error}</Notice> : null}
 
@@ -152,13 +187,13 @@ function Dashboard() {
         </View>
       ) : null}
 
-      {s.phase === 'done' && !dismissedDone ? (
+      {!glass && s.phase === 'done' && !dismissedDone ? (
         <Notice tone="success" title="Cooking finished">The oven has switched off its heat and is cooling down.</Notice>
       ) : null}
 
       {s.active ? (
         <ActiveControls s={s} unit={unit} busy={busy} run={run} />
-      ) : (
+      ) : glass ? null : (
         <IdleControls disabled={offline && !link?.demo} onDismissDone={() => setDismissedDone(true)} showDismiss={s.phase === 'done' && !dismissedDone} />
       )}
     </Screen>
@@ -190,7 +225,7 @@ function ActiveControls({ s, unit, busy, run }: {
   s: ReturnType<typeof useOven>['snap']; unit: 'F' | 'C'; busy: string | null;
   run: (key: string, fn: () => Promise<void>) => Promise<void>;
 }) {
-  const { c } = useTheme();
+  const { c, f, look } = useTheme();
   const { link } = useOven();
   const step = unit === 'F' ? 5 : 5 * (5 / 9);
   const [pendingC, setPendingC] = useState<number | null>(null);
@@ -198,6 +233,8 @@ function ActiveControls({ s, unit, busy, run }: {
   const shownTarget = pendingC ?? s.targetC;
   const now = useNow(s.remainingMs !== null);
   const left = remainingNow(s, now);
+  // On glass the card already carries Stop and the +1/+5/+10 buttons.
+  const glass = look.hero === 'glass';
 
   function nudge(dir: 1 | -1) {
     if (shownTarget === null) return;
@@ -220,7 +257,7 @@ function ActiveControls({ s, unit, busy, run }: {
           <View style={styles.stepper}>
             <RoundButton icon="minus" label={`Lower by 5 degrees`} onPress={() => nudge(-1)} />
             <View style={{ alignItems: 'center', flex: 1 }}>
-              <Text style={{ fontFamily: fonts.display, fontSize: 48, lineHeight: 54, color: c.ink, fontVariant: ['tabular-nums'] }}>
+              <Text style={{ fontFamily: f.number, fontSize: glass ? 56 : 48, lineHeight: glass ? 58 : 54, color: c.ink, fontVariant: ['tabular-nums'] }}>
                 {show(shownTarget, unit)}°
               </Text>
               <T v="small" muted>{busy === 'temp' ? 'Sending to the oven…' : pendingC !== null ? 'Setting…' : unit === 'F' ? 'Fahrenheit' : 'Celsius'}</T>
@@ -230,31 +267,36 @@ function ActiveControls({ s, unit, busy, run }: {
         </View>
       </Card>
 
-      <Card>
-        <View style={{ gap: space[3] }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <SectionLabel>Timer</SectionLabel>
-            {left !== null ? <T v="bodyStrong">{formatDuration(left)} left</T> : <T v="small" muted>Not set</T>}
+      {glass && left !== null ? null : (
+        <Card>
+          <View style={{ gap: space[3] }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <SectionLabel>Timer</SectionLabel>
+              {left !== null ? <T v="bodyStrong">{formatDuration(left)} left</T> : <T v="small" muted>Not set</T>}
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+              {(left !== null ? [1, 5, 10] : [10, 20, 30, 45]).map((m) => (
+                <Chip key={m} onPress={() => addTimer(m)} accessibilityLabel={left !== null ? `Add ${m} minutes` : `Set ${m} minute timer`}>
+                  {left !== null ? `+${m} min` : `${m} min`}
+                </Chip>
+              ))}
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
-            {(left !== null ? [1, 5, 10] : [10, 20, 30, 45]).map((m) => (
-              <Chip key={m} onPress={() => addTimer(m)} accessibilityLabel={left !== null ? `Add ${m} minutes` : `Set ${m} minute timer`}>
-                {left !== null ? `+${m} min` : `${m} min`}
-              </Chip>
-            ))}
-          </View>
-        </View>
-      </Card>
+        </Card>
+      )}
 
-      <Button
-        icon="stop"
-        busy={busy === 'cancel'}
-        onPress={async () => {
-          if (await confirm('Stop cooking?', 'The oven will turn off its heat.', 'Stop cooking')) run('cancel', () => link!.cancel());
-        }}
-      >
-        Stop cooking
-      </Button>
+      {glass ? null : (
+        <Button
+          variant="stop"
+          icon="stop"
+          busy={busy === 'cancel'}
+          onPress={async () => {
+            if (!look.confirmStop || await confirm('Stop cooking?', 'The oven will turn off its heat.', 'Stop cooking')) run('cancel', () => link!.cancel());
+          }}
+        >
+          Stop cooking
+        </Button>
+      )}
     </View>
   );
 }

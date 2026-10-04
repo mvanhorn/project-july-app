@@ -7,13 +7,13 @@ import { Icon } from '@/components/Icon';
 import { pillState, useNow } from '@/components/OvenHero';
 import { Notice, Screen, StatusPill, T } from '@/components/ui';
 import { useOven } from '@/state/oven';
-import { fonts, radius, space, useTheme } from '@/theme';
+import { space, useTheme } from '@/theme';
 
 const DEMO_IMAGE = require('../../assets/demo-camera.jpg');
 const FRAME_MS = 400;
 
 export default function Camera() {
-  const { c } = useTheme();
+  const { c, f, r } = useTheme();
   const { link, snap: s, prefs } = useOven();
   const [src, setSrc] = useState<string | null>(null);
   const [lastFrame, setLastFrame] = useState<number | null>(null);
@@ -36,7 +36,7 @@ export default function Camera() {
 
   return (
     <Screen>
-      <View style={[styles.frame, { backgroundColor: '#100c09', borderColor: c.line }]}>
+      <View style={[styles.frame, { borderRadius: r.lg, backgroundColor: c.win, borderColor: c.line }]}>
         {source ? (
           <Image
             source={source}
@@ -52,17 +52,17 @@ export default function Camera() {
         {!fresh ? (
           <View style={styles.waiting}>
             <Icon name="camera" size={36} color="#b8aa98" />
-            <Text style={styles.waitingText}>{failed ? 'No picture yet' : 'Waking the camera…'}</Text>
+            <Text style={[styles.waitingText, { fontFamily: f.sans }]}>{failed ? 'No picture yet' : 'Waking the camera…'}</Text>
           </View>
         ) : null}
         <View style={styles.overlay}>
           <View style={styles.badge}>
             <View style={[styles.dot, { backgroundColor: fresh ? '#f89a4e' : '#877869' }]} />
-            <Text style={styles.badgeText}>{fresh ? 'LIVE' : 'PAUSED'}</Text>
+            <Text style={[styles.badgeText, { fontFamily: f.sansStrong }]}>{fresh ? 'LIVE' : 'PAUSED'}</Text>
           </View>
           <View style={styles.badge}>
             <Icon name="thermometer" size={16} color="#f4eee4" />
-            <Text style={styles.badgeText}>{show(s.cavityC, prefs.unit)}°{prefs.unit}</Text>
+            <Text style={[styles.badgeText, { fontFamily: f.sansStrong }]}>{show(s.cavityC, prefs.unit)}°{prefs.unit}</Text>
           </View>
         </View>
       </View>
@@ -86,14 +86,14 @@ export default function Camera() {
 }
 
 const styles = StyleSheet.create({
-  frame: { aspectRatio: 4 / 3, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  frame: { aspectRatio: 4 / 3, overflow: 'hidden', borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   waiting: { alignItems: 'center', gap: space[2] },
-  waitingText: { color: '#b8aa98', fontFamily: fonts.sans, fontSize: 16 },
+  waitingText: { color: '#b8aa98', fontSize: 16 },
   overlay: { position: 'absolute', top: space[3], left: space[3], right: space[3], flexDirection: 'row', justifyContent: 'space-between' },
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(23,19,15,0.72)',
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.full,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9999,
   },
   dot: { width: 8, height: 8, borderRadius: 4 },
-  badgeText: { color: '#f4eee4', fontFamily: fonts.sansStrong, fontSize: 14, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
+  badgeText: { color: '#f4eee4', fontSize: 14, letterSpacing: 0.5, fontVariant: ['tabular-nums'] },
 });

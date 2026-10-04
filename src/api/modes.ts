@@ -16,6 +16,13 @@ export const MODES: CookMode[] = [
   { id: 'slow_cook', label: 'Slow cook', hint: 'Low and slow for hours', defaultF: 225, minF: 180, maxF: 275 },
 ];
 
+/**
+ * Idle tiles on the glass home screen. The Home Assistant card offers bake, roast,
+ * broil, air fry and toast; toast is not in MODES here (a refused temperature change
+ * must never restart it, see scripts/client.test.ts), so pizza takes its place.
+ */
+export const QUICK_MODES = ['bake', 'roast', 'broil', 'airfry', 'pizzaiolo'];
+
 export function modeLabel(id: string | null | undefined): string {
   if (!id) return 'Cooking';
   const m = MODES.find((x) => x.id === id || id.startsWith(x.id));

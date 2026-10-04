@@ -1,24 +1,38 @@
-# July Oven — mobile companion
+# Project July — mobile app
 
-The phone app for Project July. One Expo / React Native codebase builds the
+The phone app for Project July ("June, local"). One Expo / React Native codebase builds the
 **iOS and Android** apps. The app talks to the oven's local `june-local`
 server over the home network, with no June cloud involved.
 
-It follows the July Oven design system (`../../design-system`): warm neutrals,
-one ember accent, Fraunces / Public Sans / IBM Plex Mono, 18px body text,
-touch targets of 48px or more, and light and dark themes.
+It has two themes, each in light and dark (Settings → Appearance, with Match phone /
+Light / Dark):
+
+- **Still Glass** (the default) matches the Home Assistant July Oven card
+  ([prj-july/ha-june-oven, docs/july-oven-card](https://github.com/prj-july/ha-june-oven/tree/main/docs/july-oven-card)).
+  It uses Barlow Semi Condensed / Barlow Condensed type and the oven's black glass in dark.
+  The oven tile follows the card's layout: name with a one-tap red Stop, a big number
+  with a status mark (↑ preheating, ✓ ready, flame cooking), the heat line, a 4:3 camera
+  and +1/+5/+10 min chips. When the oven is off it shows the home screen, with a clock and
+  glowing mode tiles. Starting goes through a review that warns the oven must be empty
+  and closes itself after 5 minutes.
+- **July** is the original July Oven design system (`../../design-system`): warm
+  neutrals, one ember accent, Fraunces / Public Sans / IBM Plex Mono, and soft cards.
+
+Both use 18px body text and touch targets of 48px or more, and meet WCAG AA contrast.
+Colours, fonts, type scale and component choices for each theme live in
+`src/theme/themes.ts`.
 
 ## What it does
 
 | Screen | |
 |---|---|
-| **Welcome** | What July Oven is, then *Set up this phone* or *Try the demo first*. |
+| **Welcome** | What Project July is, then *Set up this phone* or *Try the demo first*. |
 | **Set up** | Enter the oven's address. The app finds the server (HTTPS first, then the plain :8080 listener) and names this phone. |
 | **Pair** | Shows the eight-digit code to type on the oven's Connect screen, with a countdown, then runs the SRP key exchange. |
 | **Oven** | Live camera still, large temperature readout, status pill, preheat progress, timer countdown and probe reading. Controls for target temperature, timer and *Stop cooking*. |
 | **Start a cook** | Mode (Bake, Roast, Air fry, Broil, Pizza, Reheat, Keep warm, Dehydrate, Proof, Slow cook), temperature and an optional timer. |
 | **Live view** | Camera stills refreshed every 400 ms. Keeps the camera awake while open. |
-| **Settings** | Oven details, connection, °F/°C, server status page, and unpairing. |
+| **Settings** | Theme and light/dark, oven details, connection, °F/°C, server status page, and unpairing. |
 
 The demo mode is a simulated oven, always labelled *Demo*, so people can try
 the app (and designers can review it) without an oven.
@@ -148,8 +162,8 @@ src/app/          screens (Expo Router): index, cook, camera, settings, setup/in
 src/api/          protocol.ts (crypto + frames), pairing.ts, client.ts (live link),
                   demo.ts, endpoint.ts, modes.ts, pairingCode.ts
 src/state/        OvenProvider (paired oven, live link, preferences), secure storage
-src/components/   design-system components ported to React Native, icons, OvenHero
-src/theme/        tokens mirrored from design-system/tokens.json
+src/components/   shared components, icons, OvenHero (July), GlassHero + glass.tsx (Still Glass)
+src/theme/        themes.ts (Still Glass and July: palettes, fonts, type, looks) and the ThemeProvider
 plugins/          Android network security config (user CAs, cleartext for :8080)
 scripts/          protocol and integration tests
 ```
