@@ -50,7 +50,8 @@
     "typecheck": "tsc --noEmit",
     "test": "npx --yes tsx scripts/protocol.test.ts && npx --yes tsx scripts/client.test.ts && npx --yes tsx scripts/camera.test.ts",
     "test:integration": "npx --yes tsx scripts/integration.test.ts",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build:apk": "node scripts/build-apk.mjs"
   },
   "private": true
 }

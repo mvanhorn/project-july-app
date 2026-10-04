@@ -148,6 +148,46 @@ If EAS can't resolve the project's git root (for example when building from a
 mapped network drive), set `EAS_NO_VCS=1`. EAS then uploads the folder as-is,
 filtered by `.easignore`. Building from a local copy of the folder also works.
 
+### Build an APK on this machine
+
+No EAS and no build quota: one command builds an APK to send to any Android phone.
+
+```bash
+npm run build:apk
+```
+
+It builds the current commit (uncommitted changes are left out, with a warning)
+and copies the APK to `dist/project-july-<commit>.apk`. By default it builds for
+64-bit ARM (`arm64-v8a`), which covers phones from the last several years;
+`npm run build:apk -- --abi=all` adds older and emulator CPUs at about four
+times the build time. The first build takes a few minutes; later ones are
+faster.
+
+**One-time setup:**
+
+- **Java 17**, for example `winget install --id Microsoft.OpenJDK.17 --scope user`.
+  The script finds it in the usual install folders, or uses `JAVA_HOME`.
+- **The Android SDK**, in `%LOCALAPPDATA%\Android\Sdk` (or `ANDROID_HOME`):
+  platform 36, build-tools 36.0.0, NDK 27.1.12297006 and CMake 3.22.1. Download
+  the command-line tools from developer.android.com into
+  `Sdk\cmdline-tools\latest`, run `sdkmanager --licenses` to read and accept
+  Google's license, then install the packages. Pass them in a file
+  (`sdkmanager --package_file=packages.txt`, one per line), because Windows
+  splits a `ndk;27…` argument at the semicolon. Android Studio's setup does the
+  same if you'd rather use it.
+
+**Why it builds in `C:\pj-july`.** On Windows the native C++ build fails in a
+deep folder: object file paths pass CMake's 250-character limit and ninja stops
+with *build.ninja still dirty after 100 tries*. A `subst` drive or a junction
+doesn't help, because Node resolves them back to the real path. So when this
+checkout's path is long, the script keeps a second git worktree at `C:\pj-july`
+(`--dir=` to choose another), moves it to the current commit, and builds there.
+Remove it with `git worktree remove C:/pj-july`.
+
+**Installing.** The APK is signed with the standard local test key, not EAS's.
+Android won't install one over the other, so uninstall an EAS build of the app
+first; that clears its pairing.
+
 ### Checks
 
 ```bash
