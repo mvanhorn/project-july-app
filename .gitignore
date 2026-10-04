@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Local agent tooling (not part of the project)
+CLAUDE.md
+.claude/
