@@ -169,6 +169,9 @@ bundle requests can keep it busy.
 
 The oven states come from `?demo=<state>` (web dev builds only), so any screen can
 be opened on its own too, for example `http://localhost:8081/?demo=cooking`.
+Below them, **Home screen layouts** shows the tile layouts under review side by
+side (`?grid=pages|fit|4x4|4x3|3col|clock`, also web dev only; see `GlassHero.tsx`).
+Switch the device size at the top to compare them on each phone.
 
 ### Build an APK on this machine
 

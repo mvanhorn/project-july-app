@@ -16,6 +16,7 @@
   button { cursor: pointer; } button:hover { border-color: var(--accent); }
   main { display: flex; flex-wrap: wrap; gap: 28px; padding: 20px 16px 40px; align-items: flex-start; }
   figure { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+  .section { flex-basis: 100%; margin: 12px 0 -8px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 15px; font-weight: 600; color: var(--ink); }
   figcaption { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 13px; }
   figcaption a { color: var(--muted); text-decoration: none; } figcaption a:hover { color: var(--accent); }
   .slot { position: relative; overflow: hidden; }
@@ -72,6 +73,14 @@
     ['Start a cook (demo)', '/cook?mode=bake&demo'],
     ['Settings (demo)', '/settings?demo'],
     ['Camera (demo)', '/camera?demo'],
+    // Options under review (?grid=, see GlassHero.tsx). Compare them at each device size.
+    ['Home screen layouts'],
+    ['Today: 4 × 2, paged', '/?demo&grid=pages'],
+    ['1. Rows that fit', '/?demo&grid=fit'],
+    ['2. Fixed 4 × 4', '/?demo&grid=4x4'],
+    ['3. 4 × 3, no Settings tile', '/?demo&grid=4x3'],
+    ['4. 3 columns, bigger tiles', '/?demo&grid=3col'],
+    ['5. 4 × 2, big clock, last cook', '/?demo&grid=clock'],
   ];
   const board = document.getElementById('board');
   const device = document.getElementById('device');
@@ -115,6 +124,13 @@
     const z = Number(zoom.value), pad = 12, W = w + pad * 2, H = h + pad * 2;
     board.innerHTML = '';
     for (const [name, path] of SCREENS) {
+      if (!path) {
+        const h = document.createElement('h2');
+        h.className = 'section';
+        h.textContent = name;
+        board.appendChild(h);
+        continue;
+      }
       const fig = document.createElement('figure');
       fig.innerHTML = `
         <figcaption><span>${name}</span><a href="${APP}${path}" target="_blank" title="Open full size">${path} ↗</a></figcaption>
