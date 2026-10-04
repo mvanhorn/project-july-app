@@ -74,7 +74,7 @@ export default function Settings() {
           onChange={(v) => setPref('cameraFps', Number(v))}
           options={CAMERA_FPS.map((v) => ({ value: String(v), label: `${v} fps` }))}
         />
-        <T v="small" muted>Pictures per second in the camera window. Higher rates ask the oven for more pictures.</T>
+        <T v="small" muted>Pictures per second while the camera is open. 1 fps is the stock June app’s rate; the oven sends about one new picture a second.</T>
       </View>
 
       {glass ? <HomeScreenSettings /> : null}

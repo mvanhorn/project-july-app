@@ -33,8 +33,13 @@ export type Prefs = {
   icon: string;
 };
 
-export const CAMERA_FPS = [0.5, 1, 2, 5];
-const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 1, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'pages', icon: 'oven' };
+/**
+ * As on the card (v0.4.4): 1 fps is the stock June app's rate. The oven sends about
+ * one new still a second, so faster rates mostly re-fetch it; they only apply while
+ * the camera window or Live view is open.
+ */
+export const CAMERA_FPS = [1, 5, 10, 15];
+const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'pages', icon: 'oven' };
 
 /** Cooks started from this phone, per mode. Kept apart from the settings, so Reset keeps them. */
 export type Uses = Record<string, number>;
@@ -79,7 +84,12 @@ export function OvenProvider({ children }: { children: ReactNode }) {
       const [p, pr, u, tr] = await Promise.all([
         load<Paired>(PAIRED_KEY), load<Partial<Prefs>>(PREFS_KEY), load<Uses>(USES_KEY), load<Record<string, Trust>>(TRUST_KEY),
       ]);
-      if (pr) setPrefs({ ...DEFAULT_PREFS, ...pr });
+      if (pr) {
+        const next = { ...DEFAULT_PREFS, ...pr };
+        // Rates from before v0.4.4's choices (0.5, 2) move to the nearest one.
+        if (!CAMERA_FPS.includes(next.cameraFps)) next.cameraFps = CAMERA_FPS.reduce((a, b) => (Math.abs(b - next.cameraFps) < Math.abs(a - next.cameraFps) ? b : a));
+        setPrefs(next);
+      }
       if (u) setUses(u);
       // Before the oven link starts, so its first request already trusts the home CA.
       if (tr) {

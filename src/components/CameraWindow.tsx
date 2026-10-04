@@ -26,7 +26,7 @@ export function CameraWindow({ name, heating, onClose }: { name: string; heating
     if (!link) return;
     link.cameraOn(120);
     const wake = setInterval(() => link.cameraOn(120), 100_000);
-    const ms = Math.max(200, 1000 / prefs.cameraFps);
+    const ms = Math.max(60, 1000 / prefs.cameraFps);
     const pull = link.demo ? null : setInterval(() => setSrc(link.latestImageUrl()), ms);
     const first = link.demo ? null : setTimeout(() => setSrc(link.latestImageUrl()), 0);
     return () => { clearInterval(wake); if (pull) clearInterval(pull); if (first) clearTimeout(first); };

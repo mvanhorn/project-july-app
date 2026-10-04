@@ -1,4 +1,5 @@
 import '@/polyfills';
+import '@/devPreview';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';

@@ -20,7 +20,7 @@ export default function Camera() {
   const now = useNow(true);
 
   // While this screen is open: keep the camera awake and pull stills at the chosen rate.
-  const frameMs = Math.max(200, 1000 / prefs.cameraFps);
+  const frameMs = Math.max(60, 1000 / prefs.cameraFps);
   useFocusEffect(useCallback(() => {
     if (!link) return;
     link.cameraOn(120);
