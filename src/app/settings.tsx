@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { probe, urls, type ProbeResult } from '@/api/endpoint';
-import { TILE_MODES, TOP_MODES } from '@/api/modes';
+import { PAGE_TILES } from '@/api/modes';
 import { NO_TRUST } from '@/api/trust';
 import { CertificatePanel } from '@/components/CertificatePanel';
 import { Button, Card, Divider, Field, Notice, Row, Screen, SectionLabel, Segmented, T, confirm } from '@/components/ui';
@@ -194,7 +194,7 @@ function HomeScreenSettings() {
           onChange={(v) => setPref('modesShown', v)}
           options={[{ value: 'pages', label: 'Pages' }, { value: 'all', label: 'All on one' }]}
         />
-        <T v="small" muted>{`Pages: the first ${TOP_MODES} in this order with Camera and Settings, then swipe for the other ${TILE_MODES.length - TOP_MODES}.`}</T>
+        <T v="small" muted>{`Pages: ${PAGE_TILES} tiles to a page in this order, swiping for the rest, with Camera and Settings on the last page.`}</T>
       </View>
 
       <View style={{ gap: space[3] }}>

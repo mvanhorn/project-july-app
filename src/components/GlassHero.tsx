@@ -15,7 +15,7 @@ import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Image } from 'expo-image';
 import type { OvenSnapshot } from '@/api/client';
-import { TOP_MODES, formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
+import { PAGE_TILES, formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
 import { useOven } from '@/state/oven';
 import { space, useTheme } from '@/theme';
 import { CameraWindow } from './CameraWindow';
@@ -150,17 +150,17 @@ export function GlassHero(p: Props) {
     // Four across, reaching the card's padding on both sides (DESIGN.md: equal margins).
     const gap = Math.min(20, Math.max(10, w * 0.034));
     const tile = Math.floor(Math.min((inner - 3 * gap) / 4, 104));
-    // Paged as on the card: the top six with Camera and Settings (its 4 × 2), so those
-    // two stay one tap away, then the rest eight to a page. Or all on one, if asked.
+    // Paged as on the card: 4 × 2 to a page, the modes first and Camera and Settings
+    // always last, on the last page. Or all on one, if asked.
     type Tile = { id: string; label: string; util?: boolean; untested?: boolean };
-    const modes: Tile[] = tileModes(prefs.modeOrder, uses).map((m) => ({ id: m.id, label: m.label, untested: m.untested }));
-    const util: Tile[] = [{ id: 'camera', label: 'Camera', util: true }, { id: 'settings', label: 'Settings', util: true }];
+    const tiles: Tile[] = [
+      ...tileModes(prefs.modeOrder, uses).map((m) => ({ id: m.id, label: m.label, untested: m.untested })),
+      { id: 'camera', label: 'Camera', util: true },
+      { id: 'settings', label: 'Settings', util: true },
+    ];
     const pages: Tile[][] = [];
-    if (prefs.modesShown === 'all' || modes.length <= TOP_MODES) pages.push([...modes, ...util]);
-    else {
-      pages.push([...modes.slice(0, TOP_MODES), ...util]);
-      for (let i = TOP_MODES; i < modes.length; i += 8) pages.push(modes.slice(i, i + 8));
-    }
+    const perPage = prefs.modesShown === 'all' ? tiles.length : PAGE_TILES;
+    for (let i = 0; i < tiles.length; i += perPage) pages.push(tiles.slice(i, i + perPage));
     const grid = (tiles: Tile[]) => {
       const rows: Tile[][] = [];
       for (let i = 0; i < tiles.length; i += 4) rows.push(tiles.slice(i, i + 4));

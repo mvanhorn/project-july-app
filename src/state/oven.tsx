@@ -27,7 +27,7 @@ export type Prefs = {
   clock: 'auto' | '12' | '24';
   /** Mode tiles in the oven's order, or most used first. */
   modeOrder: 'oven' | 'used';
-  /** Mode tiles in pages you swipe (the first six with Camera and Settings, then the rest), or all on one. */
+  /** Mode tiles in pages you swipe (8 to a page, Camera and Settings last), or all on one. */
   modesShown: 'pages' | 'all';
   /** One of OVEN_ICONS, or any "mdi:" icon. */
   icon: string;
