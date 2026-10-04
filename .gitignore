@@ -43,3 +43,7 @@ yarn-error.*
 # Local agent tooling (not part of the project)
 CLAUDE.md
 .claude/
+
+# Local native modules: build output
+/modules/*/android/build/
+/modules/*/android/.cxx/
