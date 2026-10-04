@@ -373,9 +373,10 @@ export class LiveOven implements OvenLink {
     // as the Home Assistant integration does. Only after a definite refusal (a
     // timeout may still have applied it), and only for a cook the phone can start
     // again: 11002 cooks run as plan 0, while touchscreen programs such as proof
-    // (plan 114) share a mode name but can't be restarted from here.
+    // (plan 114) share a mode name but can't be restarted from here. Toast is
+    // startable but never restarted (see CookMode.noRestart).
     const mode = this.s.mode;
-    if (status === null || !mode || this.s.planId !== 0 || !MODES.some((m) => m.id === mode)) throw ackError(status);
+    if (status === null || !mode || this.s.planId !== 0 || !MODES.some((m) => m.id === mode && !m.noRestart)) throw ackError(status);
     await this.cancel();
     await new Promise((r) => setTimeout(r, 400));
     await this.preheat(mode, tempC);

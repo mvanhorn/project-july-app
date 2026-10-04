@@ -178,10 +178,12 @@ function glyphBody(mode: string, color: string, w: number, wThin: number) {
 }
 
 /** A square glowing tile with the mode's glyph, its label underneath. */
-export function ModeTile({ mode, label, size, onPress, util, selected, accessibilityLabel, labelWidth }: {
+export function ModeTile({ mode, label, size, onPress, util, selected, accessibilityLabel, labelWidth, untested }: {
   mode: string; label: string; size: number; onPress?: () => void; util?: boolean; selected?: boolean; accessibilityLabel?: string;
   /** Room for the label; defaults to a little wider than the tile. */
   labelWidth?: number;
+  /** A mode not yet started on a real oven (CookMode.untested): a small "?" in the corner. */
+  untested?: boolean;
 }) {
   const { c, f } = useTheme();
   const face = useSvgId('f');
@@ -225,6 +227,14 @@ export function ModeTile({ mode, label, size, onPress, util, selected, accessibi
         <View style={{ position: 'absolute', left: size * 0.16, top: size * 0.16 }}>
           <ModeGlyph mode={mode} color={glyphColor} size={size * 0.68} glow={glows ? '#ff6a1a' : undefined} />
         </View>
+        {untested ? (
+          <View style={{
+            position: 'absolute', top: size * 0.07, right: size * 0.07, width: Math.max(16, size * 0.22), height: Math.max(16, size * 0.22),
+            borderRadius: 999, borderWidth: 1, borderColor: c.utilRim, backgroundColor: c.surfaceSunken, alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Text style={{ fontFamily: f.sansStrong, fontSize: Math.max(10, size * 0.14), lineHeight: Math.max(13, size * 0.18), color: c.inkMuted }}>?</Text>
+          </View>
+        ) : null}
       </View>
       {label ? <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 20, color: selected ? c.ember : c.ink, maxWidth: labelWidth ?? size + 16 }}>{label}</Text> : null}
     </Pressable>

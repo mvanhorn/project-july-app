@@ -27,12 +27,14 @@ export type Prefs = {
   clock: 'auto' | '12' | '24';
   /** Mode tiles in the oven's order, or most used first. */
   modeOrder: 'oven' | 'used';
+  /** The home screen shows the first six modes (with All modes to see the rest), or all of them. */
+  modesShown: 'top' | 'all';
   /** One of OVEN_ICONS, or any "mdi:" icon. */
   icon: string;
 };
 
 export const CAMERA_FPS = [0.5, 1, 2, 5];
-const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 1, hideName: true, clock: 'auto', modeOrder: 'oven', icon: 'oven' };
+const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 1, hideName: true, clock: 'auto', modeOrder: 'oven', modesShown: 'top', icon: 'oven' };
 
 /** Cooks started from this phone, per mode. Kept apart from the settings, so Reset keeps them. */
 export type Uses = Record<string, number>;

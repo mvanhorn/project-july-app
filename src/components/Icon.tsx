@@ -4,7 +4,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 
 export type IconName =
   | 'oven' | 'thermometer' | 'camera' | 'house' | 'wifi' | 'check-circle'
-  | 'timer' | 'flame' | 'stop' | 'plus' | 'minus' | 'chevron-right' | 'chevron-left'
+  | 'timer' | 'flame' | 'stop' | 'plus' | 'minus' | 'chevron-right' | 'chevron-left' | 'chevron-down' | 'chevron-up'
   | 'gear' | 'probe' | 'light' | 'link' | 'alert';
 
 export function Icon({ name, size = 24, color }: { name: IconName; size?: number; color: string }) {
@@ -63,6 +63,10 @@ function glyph(name: IconName, s: object, color: string) {
       return <Path d="m9.5 6 6 6-6 6" {...s} />;
     case 'chevron-left':
       return <Path d="m14.5 6-6 6 6 6" {...s} />;
+    case 'chevron-down':
+      return <Path d="m6 9.5 6 6 6-6" {...s} />;
+    case 'chevron-up':
+      return <Path d="m6 14.5 6-6 6 6" {...s} />;
     case 'gear':
       // Drawn as sliders: reads as "settings" without looking like a sun.
       return (<>

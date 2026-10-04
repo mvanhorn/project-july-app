@@ -14,8 +14,9 @@ Light / Dark):
   while heating) with its name and a one-tap red Stop, a big number with a status mark
   (↑ preheating, ✓ ready, flame cooking), the heat line, a 4:3 camera and +1/+5/+10
   buttons. When the oven is off it shows the home screen: the clock and glowing mode
-  tiles for all ten modes, with Camera and Settings last (4 × 3); the name tucks into the
-  icon after 5 s. Camera opens a floating window over the tile. Starting goes through a
+  tiles: the top six modes with Camera and Settings (4 × 2), and All modes for the rest
+  (or all of them, in Settings). Modes not yet started on a real oven carry a "?". The
+  name tucks into the icon after 5 s. Camera opens a floating window over the tile. Starting goes through a
   review with a slider and a typed temperature, which warns the oven must be empty and
   closes itself after 5 minutes.
 - **July** is the original July Oven design system (`../../design-system`): warm
@@ -32,8 +33,8 @@ Colours, fonts, type scale and component choices for each theme live in
 | **Welcome** | What Project July is, then *Set up this phone* or *Try the demo first*. |
 | **Set up** | Finds the oven on the home network (or takes a typed address), checks the server (HTTPS first, then the plain listener on port 80 or 8080), optionally takes the home `ca.crt`, and names this phone. |
 | **Pair** | Shows the eight-digit code to type on the oven's Connect screen, with a countdown, then runs the SRP key exchange. |
-| **Oven** | Live camera still, large temperature readout, status pill, preheat progress, timer countdown, and probe reading with its target. Controls for target temperature, timer and *Stop cooking*. |
-| **Start a cook** | Mode (Bake, Roast, Air fry, Broil, Pizza, Reheat, Keep warm, Dehydrate, Proof, Slow cook), temperature and an optional timer. |
+| **Oven** | Live camera still, large temperature readout, status pill, preheat progress, timer countdown and probe reading. Controls for target temperature, timer and *Stop cooking*. |
+| **Start a cook** | Mode, temperature and an optional timer. Bake is proven on a real oven; Roast, Air fry and Broil are names the Home Assistant integration sends. Toast, Pizza, Reheat, Keep warm, Dehydrate, Proof and Slow cook are marked untested: some (Proof, likely Toast) are programs on the oven, which may not start by name. |
 | **Live view** | Camera stills at the chosen frame rate (1 per second by default). Keeps the camera awake while open. |
 | **Settings** | Theme and light/dark, oven details, connection, °F/°C, camera frame rate, server status page, and unpairing. With Still Glass, also the home screen choices from the Home Assistant card: the name tucking into the icon, cook modes in the oven's order or most used first, a 12/24-hour clock, and the oven's icon (12 of its own, or any `mdi:` icon). |
 

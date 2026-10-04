@@ -189,6 +189,7 @@ function GlassReview({ mode, tempF, setTempF, nudge, unit, busy, error, onStart,
           <T v="small" muted style={{ textAlign: 'center' }}>{mode.hint}</T>
         </View>
 
+        <UntestedNote mode={mode} />
         {timer}
       </Screen>
     </>
@@ -223,7 +224,7 @@ function JulyCook({ modeId, pick, tempF, shown, nudge, unit, busy, error, onStar
                 key={m.id}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: on }}
-                accessibilityLabel={`${m.label}. ${m.hint}`}
+                accessibilityLabel={`${m.label}${m.untested ? " (untested)" : ""}. ${m.hint}`}
                 onPress={() => { Haptics.selectionAsync().catch(() => {}); pick(m.id); }}
                 style={({ pressed }) => [
                   styles.tile,
@@ -236,6 +237,7 @@ function JulyCook({ modeId, pick, tempF, shown, nudge, unit, busy, error, onStar
                   {on ? <Icon name="check-circle" size={20} color={c.ember} /> : null}
                 </View>
                 <Text style={{ fontFamily: f.sans, fontSize: 15, lineHeight: 20, color: c.inkMuted }} numberOfLines={2}>{m.hint}</Text>
+                {m.untested ? <Text style={{ fontFamily: f.sansStrong, fontSize: 13, color: c.inkMuted }}>Untested</Text> : null}
               </Pressable>
             );
           })}
@@ -256,8 +258,19 @@ function JulyCook({ modeId, pick, tempF, shown, nudge, unit, busy, error, onStar
         </View>
       </View>
 
+      <UntestedNote mode={mode} />
       {timer}
     </Screen>
+  );
+}
+
+/** For a mode nobody has started from a phone yet (CookMode.untested). */
+function UntestedNote({ mode }: { mode: (typeof MODES)[number] }) {
+  if (!mode.untested) return null;
+  return (
+    <Notice tone="info" title="Not tried on a real oven yet">
+      {`Nobody has started ${mode.label} from a phone yet. On the oven it may be a program, which this app can’t start yet. If the oven doesn’t accept it, the app says so and nothing heats.`}
+    </Notice>
   );
 }
 

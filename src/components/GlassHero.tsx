@@ -15,7 +15,7 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { Image } from 'expo-image';
 import type { OvenSnapshot } from '@/api/client';
-import { formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
+import { TOP_MODES, formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
 import { useOven } from '@/state/oven';
 import { space, useTheme } from '@/theme';
 import { CameraWindow } from './CameraWindow';
@@ -116,6 +116,7 @@ export function GlassHero(p: Props) {
   const { prefs, uses } = useOven();
   const [w, setW] = useState(372);
   const [camera, setCamera] = useState(false);
+  const [allModes, setAllModes] = useState(false);
   // Screens hidden in the stack lay out at 0 wide; keep the last real width.
   const onLayout = (e: LayoutChangeEvent) => { const lw = e.nativeEvent.layout.width; if (lw >= 200) setW(lw); };
   const closeCamera = useCallback(() => setCamera(false), []);
@@ -148,8 +149,12 @@ export function GlassHero(p: Props) {
     // Four across, reaching the card's padding on both sides (DESIGN.md: equal margins).
     const gap = Math.min(20, Math.max(10, w * 0.034));
     const tile = Math.floor(Math.min((inner - 3 * gap) / 4, 104));
-    const tiles: { id: string; label: string; util?: boolean }[] = [
-      ...tileModes(prefs.modeOrder, uses).map((m) => ({ id: m.id, label: m.label })),
+    // The top six (with Camera and Settings, the card's 4 × 2) unless all were asked for.
+    const modes = tileModes(prefs.modeOrder, uses);
+    const folds = prefs.modesShown === 'top' && modes.length > TOP_MODES;
+    const shown = folds && !allModes ? modes.slice(0, TOP_MODES) : modes;
+    const tiles: { id: string; label: string; util?: boolean; untested?: boolean }[] = [
+      ...shown.map((m) => ({ id: m.id, label: m.label, untested: m.untested })),
       { id: 'camera', label: 'Camera', util: true },
       { id: 'settings', label: 'Settings', util: true },
     ];
@@ -176,10 +181,11 @@ export function GlassHero(p: Props) {
                   mode={t.id}
                   label={t.label}
                   util={t.util}
+                  untested={t.untested}
                   size={tile}
                   labelWidth={tile + gap}
                   onPress={() => (t.id === 'camera' ? setCamera(true) : t.id === 'settings' ? p.onSettings() : p.onMode(t.id))}
-                  accessibilityLabel={t.util ? `${t.label} for ${p.name}` : `${t.label}: review and start`}
+                  accessibilityLabel={t.util ? `${t.label} for ${p.name}` : `${t.label}${t.untested ? ', untested' : ''}: review and start`}
                 />
               ))}
               {/* Keep a short last row on the grid. */}
@@ -187,6 +193,17 @@ export function GlassHero(p: Props) {
             </View>
           ))}
         </View>
+        {folds ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: allModes }}
+            onPress={() => setAllModes((a) => !a)}
+            style={({ pressed }) => [styles.more, { borderRadius: r.md, backgroundColor: pressed ? c.surfaceSunken : 'transparent' }]}
+          >
+            <Text style={{ fontFamily: f.sansMedium, fontSize: 16, color: c.inkMuted }}>{allModes ? 'Fewer modes' : `All ${modes.length} modes`}</Text>
+            <Icon name={allModes ? 'chevron-up' : 'chevron-down'} size={20} color={c.inkMuted} />
+          </Pressable>
+        ) : null}
       </View>,
     );
   }
@@ -303,4 +320,5 @@ const styles = StyleSheet.create({
   action: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   cam: { width: '100%', aspectRatio: 4 / 3, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   camSheen: { position: 'absolute', left: 1, right: 1, top: 1, height: 2, borderTopWidth: 1 },
+  more: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 48, marginTop: space[2], marginBottom: -space[2] },
 });

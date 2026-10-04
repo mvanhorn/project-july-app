@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 import { probe, urls, type ProbeResult } from '@/api/endpoint';
+import { TILE_MODES, TOP_MODES } from '@/api/modes';
 import { NO_TRUST } from '@/api/trust';
 import { CertificatePanel } from '@/components/CertificatePanel';
 import { Button, Card, Divider, Field, Notice, Row, Screen, SectionLabel, Segmented, T, confirm } from '@/components/ui';
@@ -187,6 +188,13 @@ function HomeScreenSettings() {
           options={[{ value: 'oven', label: 'Oven’s order' }, { value: 'used', label: 'Most used first' }]}
         />
         <T v="small" muted>Most used first counts the cooks started from this phone.</T>
+        <Segmented
+          label="Cook modes on the home screen"
+          value={prefs.modesShown}
+          onChange={(v) => setPref('modesShown', v)}
+          options={[{ value: 'top', label: `Top ${TOP_MODES}` }, { value: 'all', label: `All ${TILE_MODES.length}` }]}
+        />
+        <T v="small" muted>{`With Top ${TOP_MODES}, the home screen shows the first ${TOP_MODES} in this order, and All modes opens the rest.`}</T>
       </View>
 
       <View style={{ gap: space[3] }}>
