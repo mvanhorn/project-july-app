@@ -1,9 +1,9 @@
 /// <reference types="node" />
 // End-to-end: the app's real PairingSession + LiveOven against the Python
-// reference server (P:\June\local-resources\june-arch\june_local_cloud.py),
-// with a simulated oven on the other side.
+// reference server (june_local_cloud.py), with a simulated oven on the other side.
 //
-// Run: npm run test:integration   (needs `py`, `openssl`, and the June repo)
+// Run: JUNE_LOCAL_CLOUD=/path/to/june_local_cloud.py npm run test:integration
+// (needs `py` and `openssl`)
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -17,7 +17,8 @@ import { PairingSession, type PairingStep } from '../src/api/pairing';
 import { LiveOven, type Paired } from '../src/api/client';
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // throwaway self-signed cert below
-const SERVER = process.env.JUNE_LOCAL_CLOUD ?? 'P:/June/local-resources/june-arch/june_local_cloud.py';
+const SERVER = process.env.JUNE_LOCAL_CLOUD;
+if (!SERVER) throw new Error('Set JUNE_LOCAL_CLOUD to the path of june_local_cloud.py');
 const PORT = 18443;
 const OVEN_ID = 'oven-sim-0001';
 const conn = { host: `127.0.0.1:${PORT}`, secure: true };

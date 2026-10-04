@@ -1,5 +1,5 @@
-// Dev-only Node preload. Some drives (like P:\ on the maintainer's machine)
-// refuse to load native .node binaries, which breaks Metro's CSS transform
+// Dev-only Node preload. Some drives (network shares, for example) refuse
+// to load native .node binaries, which breaks Metro's CSS transform
 // (lightningcss) and ESLint's resolver. This loads each binary from a copy in
 // the OS temp dir instead. Use it only if you see "Access is denied" or
 // "Cannot find native binding":

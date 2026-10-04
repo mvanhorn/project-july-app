@@ -1,5 +1,4 @@
-// One configured endpoint (the oven's LAN address) derives every URL, matching
-// the operator pack's "Phone endpoint behavior" table.
+// One configured endpoint (the oven's LAN address) derives every URL.
 //
 // june-local serves the same routes on both listeners, so a phone that cannot
 // trust the home certificate can fall back to the plain :8080 listener. Commands

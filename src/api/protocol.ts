@@ -1,6 +1,6 @@
 // June wire protocol: SRP-6a pairing, NaCl sealing, Ed25519-signed frames.
 // Ported from ha-june-oven/custom_components/june_oven/protocol.py (tested
-// against a real oven); see P:\June\docs\june-protocol-notes.md for the spec.
+// against a real oven).
 import { sha1 } from '@noble/hashes/legacy.js';
 import { blake2b } from '@noble/hashes/blake2.js';
 import { ed25519, x25519 } from '@noble/curves/ed25519.js';

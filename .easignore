@@ -1,4 +1,4 @@
-# Used when building with EAS_NO_VCS=1 (P: is a network share whose git root EAS can't resolve).
+# Used when building with EAS_NO_VCS=1 (when EAS can't resolve the git root, e.g. on a network drive).
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
 # dependencies

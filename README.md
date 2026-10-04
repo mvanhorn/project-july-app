@@ -15,7 +15,7 @@ Light / Dark):
   and +1/+5/+10 min chips. When the oven is off it shows the home screen, with a clock and
   glowing mode tiles. Starting goes through a review that warns the oven must be empty
   and closes itself after 5 minutes.
-- **July** is the original July Oven design system (`../../design-system`): warm
+- **July** is the original July Oven design system: warm
   neutrals, one ember accent, Fraunces / Public Sans / IBM Plex Mono, and soft cards.
 
 Both use 18px body text and touch targets of 48px or more, and meet WCAG AA contrast.
@@ -39,10 +39,9 @@ the app (and designers can review it) without an oven.
 
 ## How it talks to the oven
 
-Source of truth: `P:\June\docs\june-protocol-notes.md`, the Go server in
-`P:\June\local-resources\june-arch\golocal`, and the tested Python client in
-`P:\June\ha-june-oven`. The operator pack (`../project-july-operator-pack`)
-covers deployment.
+Source of truth: the `june-local` server and the tested Python client in
+[prj-july/ha-june-oven](https://github.com/prj-july/ha-june-oven), which runs
+against real ovens.
 
 - **Pairing** (`src/api/pairing.ts`). The app registers as a companion
   (`POST /2/devices/register`), opens `wss://<oven>/1/messaging/websocket/companion`,
@@ -71,7 +70,7 @@ HTTPS first. If the phone doesn't trust the home certificate yet, it uses :8080
 and says so on the setup and settings screens. On :8080, commands are still
 signed and pairing is still SRP-protected, but the link itself is not encrypted.
 
-To use HTTPS, generate per-install certs with `generate_certs.sh` (set
+To use HTTPS, generate per-install certs with june-local's `generate_certs.sh` (set
 `JUNE_IP_SAN` to the oven's IP so the address people type matches the
 certificate), then install `ca.crt` on the phone:
 
@@ -107,22 +106,9 @@ npx eas-cli@latest build --profile preview --platform all
 
 iOS builds need an Apple Developer account; EAS handles signing, so no Mac is needed.
 
-**Building from P: (a network share).** P: maps to `\\NAS2\gene2\Programming`.
-If you run EAS from `P:\…`, Node resolves the project's real path to the UNC
-form, so the project root no longer matches the working directory. EAS then
-sends an absolute Windows path, and the build fails with
-*package.json does not exist in …/P:/June Website/…*. Run EAS from the UNC
-path instead. `cmd.exe`, and therefore `npx`, can't start in a UNC folder, so
-use Git Bash and call a locally installed eas-cli with `node`:
-
-```bash
-cd "//NAS2/gene2/Programming/June Website/apps/july-companion"
-EAS_NO_VCS=1 node /path/to/node_modules/eas-cli/bin/run build --profile preview --platform android
-```
-
-`EAS_NO_VCS=1` uploads the folder as-is, filtered by `.easignore`. Building from
-a local (non-network) copy of the folder also avoids all of this. The project is
-linked as `@fixitfelixs-team/project-july`.
+If EAS can't resolve the project's git root (for example when building from a
+mapped network drive), set `EAS_NO_VCS=1`. EAS then uploads the folder as-is,
+filtered by `.easignore`. Building from a local copy of the folder also works.
 
 ### Checks
 
@@ -146,7 +132,8 @@ npm run test:integration
   vectors: the SRP `B` hash, the Damm check digit, signature layout, and a full
   SRP handshake where both sides derive the same key.
 - `npm run test:integration` starts the Python reference server
-  (`june_local_cloud.py`, needs `py` and `openssl`) with a throwaway certificate.
+  (`june_local_cloud.py`; set `JUNE_LOCAL_CLOUD` to its path, needs `py` and
+  `openssl`) with a throwaway certificate.
   It then drives the app's real `PairingSession` and `LiveOven` against a
   simulated oven: pairing, preheat, timer, temperature change, cancel, camera
   URL, and an Ed25519 check of every frame.
@@ -172,8 +159,8 @@ scripts/          protocol and integration tests
 
 - **Not yet tested on a real oven.** Protocol behaviour comes from the Home
   Assistant integration (which does run against ovens) and the reference server.
-  Pair a phone and run the checks in `operations-and-verification.md` before
-  handing the app to owners.
+  Pair a phone and check every control against a real oven before handing the
+  app to owners.
 - Changing the temperature mid-cook tries `11005`. If the oven refuses, the app
   restarts the cook at the new temperature, as the Home Assistant integration does.
 - No recipes or guided programs yet (june-local serves no recipe data), no probe

@@ -1,6 +1,4 @@
 // Eight-digit pairing code: server_code(5) + random(2) + Damm check(1).
-// See apps/project-july-operator-pack/pairing-code.md.
-
 const DAMM = [
   [0, 3, 1, 7, 5, 9, 8, 6, 4, 2],
   [7, 0, 9, 2, 1, 5, 4, 8, 6, 3],
