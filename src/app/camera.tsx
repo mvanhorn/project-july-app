@@ -19,17 +19,15 @@ export default function Camera() {
   const [failed, setFailed] = useState(false);
   const now = useNow(true);
 
-  // Watch the camera while this screen is open and the app is in front. Stopping
-  // lets the oven turn its camera and interior light off again.
+  // While this screen is open: keep the camera awake and pull stills at the chosen rate.
+  const frameMs = Math.max(200, 1000 / prefs.cameraFps);
   useFocusEffect(useCallback(() => {
     if (!link) return;
-    let stop: (() => void) | null = null;
-    const start = () => { stop ??= link.watchCamera(setSrc); };
-    const pause = () => { stop?.(); stop = null; };
-    if (AppState.currentState === 'active') start();
-    const sub = AppState.addEventListener('change', (state) => (state === 'active' ? start() : pause()));
-    return () => { sub.remove(); pause(); };
-  }, [link]));
+    link.cameraOn(120);
+    const wake = setInterval(() => link.cameraOn(120), 100_000);
+    const pull = link.demo ? null : setInterval(() => setSrc(link.latestImageUrl()), frameMs);
+    return () => { clearInterval(wake); if (pull) clearInterval(pull); };
+  }, [link, frameMs]));
 
   const frameAt = link?.demo ? s.imageAt : lastFrame;
   const age = frameAt ? Math.round((now - frameAt) / 1000) : null;

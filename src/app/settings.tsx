@@ -1,16 +1,21 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
-import { PLAIN_PORT, urls } from '@/api/endpoint';
-import { Button, Card, Divider, Notice, Row, Screen, SectionLabel, Segmented, T, confirm } from '@/components/ui';
-import { useOven, useOvenName } from '@/state/oven';
+import { probe, urls, type ProbeResult } from '@/api/endpoint';
+import { NO_TRUST } from '@/api/trust';
+import { CertificatePanel } from '@/components/CertificatePanel';
+import { Button, Card, Divider, Field, Notice, Row, Screen, SectionLabel, Segmented, T, confirm } from '@/components/ui';
+import { CAMERA_FPS, useOven, useOvenName } from '@/state/oven';
 import { Icon } from '@/components/Icon';
+import { OVEN_ICONS, OvenIcon, mdiName } from '@/components/OvenIcon';
 import { space, THEMES, useTheme, useThemeSettings, type ThemeId } from '@/theme';
 
 export default function Settings() {
-  const { c } = useTheme();
-  const { paired, link, prefs, setUnit, forget } = useOven();
+  const { c, look } = useTheme();
+  const { paired, link, prefs, setUnit, setPref, forget } = useOven();
+  const glass = look.hero === 'glass';
   const name = useOvenName();
   const demo = !!link?.demo;
 
@@ -43,23 +48,7 @@ export default function Settings() {
         </View>
       ) : null}
 
-      {paired ? (
-        <View style={{ gap: space[3] }}>
-          <SectionLabel>Connection</SectionLabel>
-          <Card padded={false}>
-            <Row icon="wifi" label="Address" value={paired.conn.host} mono />
-            <Divider />
-            <Row icon="house" label="Link" value={paired.conn.secure ? 'Secure (HTTPS)' : `Local port ${paired.conn.port ?? PLAIN_PORT}`} />
-            <Divider />
-            <Row icon="link" label="Server status page" onPress={() => WebBrowser.openBrowserAsync(urls(paired.conn).statusPage)} />
-          </Card>
-          {!paired.conn.secure ? (
-            <Notice tone="info" title="Using the local port">
-              Commands are signed by this phone, so the oven only obeys you. To also encrypt the connection, install your home’s certificate (ca.crt) on this phone and pair again.
-            </Notice>
-          ) : null}
-        </View>
-      ) : null}
+      {paired ? <ConnectionSettings /> : null}
 
       <View style={{ gap: space[3] }}>
         <SectionLabel>Appearance</SectionLabel>
@@ -77,6 +66,19 @@ export default function Settings() {
       </View>
 
       <View style={{ gap: space[3] }}>
+        <SectionLabel>Camera frame rate</SectionLabel>
+        <Segmented
+          label="Camera frame rate"
+          value={String(prefs.cameraFps)}
+          onChange={(v) => setPref('cameraFps', Number(v))}
+          options={CAMERA_FPS.map((v) => ({ value: String(v), label: `${v} fps` }))}
+        />
+        <T v="small" muted>Pictures per second in the camera window. Higher rates ask the oven for more pictures.</T>
+      </View>
+
+      {glass ? <HomeScreenSettings /> : null}
+
+      <View style={{ gap: space[3] }}>
         <SectionLabel>About</SectionLabel>
         <T muted>
           Project July is a community project that keeps June ovens working after the June cloud shut down. This phone talks to june-local, a small server that runs on the oven itself. It is not made by, or affiliated with, June or Weber.
@@ -90,6 +92,152 @@ export default function Settings() {
         </Button>
       ) : null}
     </Screen>
+  );
+}
+
+/** How this phone reaches the paired oven, and the oven's home certificate. */
+function ConnectionSettings() {
+  const { paired, trusts, setHostTrust, updateConnection } = useOven();
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState<ProbeResult | null>(null);
+  if (!paired) return null;
+  const { conn } = paired;
+  const trust = trusts[conn.host] ?? NO_TRUST;
+  const link = !conn.secure ? `Plain port ${conn.httpPort ?? 8080}`
+    : trust.caPem ? 'HTTPS, checked against your ca.crt'
+    : trust.insecure ? 'HTTPS, certificate not checked'
+    : 'Secure (HTTPS)';
+
+  // After a certificate change: use HTTPS if it now works, or the plain port if not.
+  async function recheck() {
+    setChecking(true);
+    setChecked(null);
+    const r = await probe(conn.host);
+    setChecked(r);
+    if (r.ok) await updateConnection({ host: conn.host, secure: r.secure, httpPort: r.httpPort ?? conn.httpPort });
+    setChecking(false);
+  }
+
+  return (
+    <View style={{ gap: space[3] }}>
+      <SectionLabel>Connection</SectionLabel>
+      <Card padded={false}>
+        <Row icon="wifi" label="Address" value={conn.host} mono />
+        <Divider />
+        <Row icon="house" label="Link" value={link} />
+        <Divider />
+        <Row icon="link" label="Server status page" onPress={() => WebBrowser.openBrowserAsync(urls(conn).statusPage)} />
+      </Card>
+      {!conn.secure ? (
+        <Notice tone="info" title="Using the plain port">
+          Commands are signed by this phone, so the oven only obeys you. To also encrypt the connection, add your home’s certificate (ca.crt) below, then check the connection.
+        </Notice>
+      ) : null}
+      <CertificatePanel trust={trust} onChange={(t) => { setHostTrust(conn.host, t); setChecked(null); }} />
+      <Button busy={checking} onPress={recheck}>Check the connection</Button>
+      {checked?.ok ? (
+        <Notice tone="success" title={checked.secure ? 'Connected over HTTPS' : `Connected on the plain port (${checked.httpPort})`}>
+          {checked.secure ? 'This phone now reaches the oven over an encrypted link.' : 'HTTPS didn’t answer, so the app keeps using the plain port.'}
+        </Notice>
+      ) : checked ? (
+        <Notice tone="warning" title="Couldn't reach the oven">{checked.message}</Notice>
+      ) : null}
+    </View>
+  );
+}
+
+/** The Home Assistant card's own settings, for the glass home screen. */
+function HomeScreenSettings() {
+  const { c, r } = useTheme();
+  const { prefs, setPref, resetPrefs } = useOven();
+  const name = useOvenName();
+  const mdi = prefs.icon.startsWith('mdi:') ? prefs.icon : '';
+  const [typed, setTyped] = useState<string | null>(null);
+  const [iconError, setIconError] = useState<string | null>(null);
+
+  function commitIcon() {
+    if (typed === null) return;
+    const v = typed.trim().toLowerCase();
+    setTyped(null);
+    if (!v) { setIconError(null); setPref('icon', 'oven'); return; }
+    const full = v.startsWith('mdi:') ? v : `mdi:${v}`;
+    if (mdiName(full)) { setIconError(null); setPref('icon', full); }
+    else setIconError(`${full} isn't in the Material Design icon set.`);
+  }
+
+  return (
+    <>
+      <View style={{ gap: space[3] }}>
+        <SectionLabel>Oven name</SectionLabel>
+        <Segmented
+          label="Oven name"
+          value={prefs.hideName ? 'tuck' : 'show'}
+          onChange={(v) => setPref('hideName', v === 'tuck')}
+          options={[{ value: 'tuck', label: 'Tuck into the icon' }, { value: 'show', label: 'Always show' }]}
+        />
+        <T v="small" muted>On the home screen the name tucks into the oven’s icon after 5 seconds. Tap the icon to see it.</T>
+      </View>
+
+      <View style={{ gap: space[3] }}>
+        <SectionLabel>Cook modes</SectionLabel>
+        <Segmented
+          label="Cook mode order"
+          value={prefs.modeOrder}
+          onChange={(v) => setPref('modeOrder', v)}
+          options={[{ value: 'oven', label: 'Oven’s order' }, { value: 'used', label: 'Most used first' }]}
+        />
+        <T v="small" muted>Most used first counts the cooks started from this phone.</T>
+      </View>
+
+      <View style={{ gap: space[3] }}>
+        <SectionLabel>Clock</SectionLabel>
+        <Segmented
+          label="Clock"
+          value={prefs.clock}
+          onChange={(v) => setPref('clock', v)}
+          options={[{ value: 'auto', label: 'Automatic' }, { value: '12', label: '12-hour' }, { value: '24', label: '24-hour' }]}
+        />
+      </View>
+
+      <View style={{ gap: space[3] }}>
+        <SectionLabel>Oven icon</SectionLabel>
+        <View accessibilityRole="radiogroup" accessibilityLabel={`Icon for ${name}`} style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
+          {Object.entries(OVEN_ICONS).map(([id, [label]]) => {
+            const on = prefs.icon === id;
+            return (
+              <Pressable
+                key={id}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                accessibilityLabel={label}
+                onPress={() => { setIconError(null); setPref('icon', id); }}
+                style={({ pressed }) => [styles.icon, {
+                  borderRadius: r.sm, borderColor: on ? c.ember : c.lineStrong, borderWidth: on ? 1.5 : 1,
+                  backgroundColor: on ? c.emberSoft : pressed ? c.surfaceSunken : 'transparent',
+                }]}
+              >
+                <OvenIcon icon={id} size={24} color={c.ink} />
+              </Pressable>
+            );
+          })}
+        </View>
+        <Field
+          label="Or any Material Design icon"
+          placeholder="mdi:stove"
+          value={typed ?? mdi}
+          onChangeText={setTyped}
+          onBlur={commitIcon}
+          onSubmitEditing={commitIcon}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="done"
+          error={iconError ?? undefined}
+          hint={mdi ? undefined : 'Such as mdi:stove or mdi:silverware-fork-knife.'}
+        />
+      </View>
+
+      <Button variant="quiet" onPress={() => { setTyped(null); setIconError(null); resetPrefs(); }}>Reset the home screen</Button>
+    </>
   );
 }
 
@@ -150,4 +298,5 @@ function ThemePicker() {
 const styles = StyleSheet.create({
   choice: { flex: 1, padding: space[3], gap: space[2] },
   swatch: { padding: space[3], gap: 4 },
+  icon: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
 });

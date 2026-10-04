@@ -17,11 +17,21 @@ export const MODES: CookMode[] = [
 ];
 
 /**
- * Idle tiles on the glass home screen. The Home Assistant card offers bake, roast,
- * broil, air fry and toast; toast is not in MODES here (a refused temperature change
- * must never restart it, see scripts/client.test.ts), so pizza takes its place.
+ * Mode tiles on the glass home screen, in the oven's order: the Home Assistant card's
+ * bake, roast, broil and air fry first (its toast is not in MODES here: a refused
+ * temperature change must never restart it, see scripts/client.test.ts), then the
+ * rest. With Camera and Settings they fill 4 × 3.
  */
-export const QUICK_MODES = ['bake', 'roast', 'broil', 'airfry', 'pizzaiolo'];
+export const TILE_MODES = ['bake', 'roast', 'broil', 'airfry', 'pizzaiolo', 'reheat', 'warm', 'dehydrate', 'proof', 'slow_cook']
+  .map((id) => MODES.find((m) => m.id === id)!);
+
+/** The tiles' modes, most used first if asked (ties keep the oven's order), as on the card. */
+export function tileModes(order: 'oven' | 'used', uses: Record<string, number>): CookMode[] {
+  if (order !== 'used') return TILE_MODES;
+  return TILE_MODES.map((m, i) => [m, i] as const)
+    .sort((a, b) => (uses[b[0].id] ?? 0) - (uses[a[0].id] ?? 0) || a[1] - b[1])
+    .map(([m]) => m);
+}
 
 export function modeLabel(id: string | null | undefined): string {
   if (!id) return 'Cooking';

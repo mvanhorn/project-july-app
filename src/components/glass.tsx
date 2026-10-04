@@ -108,7 +108,7 @@ export function StatusLine({ kind, word, qualifier, size = 'normal' }: { kind: M
 }
 
 // --- Mode glyphs: the heating elements each mode uses -----------------------------
-// bake, broil, roast, toast, airfry and settings are the card's own; the rest are
+// bake, broil, roast, toast, airfry, camera and settings are the card's own; the rest are
 // drawn to the same rules (48 box, 4 px stroke, 3 px for thin parts).
 
 export function ModeGlyph({ mode, color, size, glow }: { mode: string; color: string; size: number; glow?: string }) {
@@ -162,6 +162,11 @@ function glyphBody(mode: string, color: string, w: number, wThin: number) {
         <Circle cx={24} cy={21} r={9} {...thin} />
         <Path d="M24 16v5l3.5 2" {...thin} />
       </>);
+      case 'camera': return (<>
+        <Path d="M9 16.5h6.5l3-4h11l3 4H39a2.5 2.5 0 0 1 2.5 2.5v15a2.5 2.5 0 0 1-2.5 2.5H9A2.5 2.5 0 0 1 6.5 34V19A2.5 2.5 0 0 1 9 16.5z" {...thin} />
+        <Circle cx={24} cy={26.5} r={6.5} {...thin} />
+      </>);
+      case 'settings':
       case 'more': return (<>
         <Circle cx={24} cy={24} r={9} {...thin} />
         <Circle cx={24} cy={24} r={3.5} {...thin} />
@@ -173,8 +178,10 @@ function glyphBody(mode: string, color: string, w: number, wThin: number) {
 }
 
 /** A square glowing tile with the mode's glyph, its label underneath. */
-export function ModeTile({ mode, label, size, onPress, util, selected, accessibilityLabel }: {
-  mode: string; label: string; size: number; onPress: () => void; util?: boolean; selected?: boolean; accessibilityLabel?: string;
+export function ModeTile({ mode, label, size, onPress, util, selected, accessibilityLabel, labelWidth }: {
+  mode: string; label: string; size: number; onPress?: () => void; util?: boolean; selected?: boolean; accessibilityLabel?: string;
+  /** Room for the label; defaults to a little wider than the tile. */
+  labelWidth?: number;
 }) {
   const { c, f } = useTheme();
   const face = useSvgId('f');
@@ -189,7 +196,8 @@ export function ModeTile({ mode, label, size, onPress, util, selected, accessibi
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
       accessibilityLabel={accessibilityLabel ?? label}
-      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      disabled={!onPress}
+      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress?.(); }}
       style={({ pressed }) => [{ alignItems: 'center', gap: 7, opacity: pressed ? 0.85 : 1 }]}
     >
       <View style={{ width: size, height: size }}>
@@ -218,17 +226,17 @@ export function ModeTile({ mode, label, size, onPress, util, selected, accessibi
           <ModeGlyph mode={mode} color={glyphColor} size={size * 0.68} glow={glows ? '#ff6a1a' : undefined} />
         </View>
       </View>
-      <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 20, color: selected ? c.ember : c.ink, maxWidth: size + 16 }}>{label}</Text>
+      {label ? <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 20, color: selected ? c.ember : c.ink, maxWidth: labelWidth ?? size + 16 }}>{label}</Text> : null}
     </Pressable>
   );
 }
 
-/** The LIVE / age pill on a camera picture. */
-export function CameraPill({ children }: { children: ReactNode }) {
+/** The LIVE / age pill on a camera picture; an old picture's age is amber. */
+export function CameraPill({ children, old }: { children: ReactNode; old?: boolean }) {
   const { f } = useTheme();
   return (
     <View style={{ position: 'absolute', left: 6, bottom: 6, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.66)' }}>
-      <Text style={{ color: '#fff', fontFamily: f.sansStrong, fontSize: 11, letterSpacing: 0.66 }}>{children}</Text>
+      <Text style={{ color: old ? '#fbbf24' : '#fff', fontFamily: f.sansStrong, fontSize: 11, letterSpacing: 0.66 }}>{children}</Text>
     </View>
   );
 }

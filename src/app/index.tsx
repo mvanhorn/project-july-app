@@ -93,6 +93,8 @@ function Dashboard() {
     setWasActive(s.active);
     if (s.active) setDismissedDone(false);
   }
+  // Glass: Done shows from when the cook completed, for 30 minutes or until dismissed.
+  const done = s.phase === 'done' && !dismissedDone ? { at: s.endedAt } : null;
 
   async function run(key: string, fn: () => Promise<void>) {
     setBusy(key);
@@ -111,7 +113,7 @@ function Dashboard() {
   const offline = s.link === 'offline' || s.ovenOnline === false;
   const now = useNow(s.remainingMs !== null);
   const left = remainingNow(s, now);
-  const connection = link?.demo ? 'Simulated — nothing is sent to an oven'
+  const connection = link?.demo ? 'Simulated. Nothing is sent to an oven.'
     : s.link === 'connecting' ? 'Connecting on your home network…'
     : offline ? 'Not connected'
     : `Connected at home · ${paired?.conn.host}`;
@@ -159,14 +161,13 @@ function Dashboard() {
           unit={unit}
           demo={!!link?.demo}
           name={name}
-          onCamera={() => router.push('/camera')}
           // Stop is one tap and never confirmed (DESIGN.md, "The rules every state follows").
           onStop={() => run('cancel', () => link!.cancel())}
           stopping={busy === 'cancel'}
           onAddMinutes={(min) => run('timer', () => link!.setTimer((left ?? 0) + min * 60_000))}
           onMode={(mode) => router.push({ pathname: '/cook', params: { mode } })}
-          onMore={() => router.push('/cook')}
-          showDone={!dismissedDone}
+          onSettings={() => router.push('/settings')}
+          done={done}
           onDismissDone={() => setDismissedDone(true)}
         />
       ) : (

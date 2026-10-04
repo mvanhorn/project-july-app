@@ -1,0 +1,20 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'org.projectjuly'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.julytls"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+  }
+}
+
+dependencies {
+  // React Native's networking (NetworkingModule, WebSocketModule) and the OkHttp it uses.
+  implementation 'com.facebook.react:react-android'
+}

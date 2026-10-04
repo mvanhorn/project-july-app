@@ -40,13 +40,15 @@ export type OvenSnapshot = {
   imageAt: number | null;
   offer: { type: 'keep_longer' | 'keep_shorter'; durationMs: number } | null;
   ended: 'completed' | 'cancelled' | null;
+  /** When `ended` was reported, in this app's clock. */
+  endedAt: number | null;
 };
 
 export const emptySnapshot = (): OvenSnapshot => ({
   link: 'connecting', ovenOnline: null, active: false, phase: 'idle', mode: null,
   cavityC: null, targetC: null, probeC: null, probeTargetC: null, planId: 0, progress: null,
   remainingMs: null, remainingAt: 0, elapsedMs: null, imageUrl: null, imageAt: null,
-  offer: null, ended: null,
+  offer: null, ended: null, endedAt: null,
 });
 
 export interface OvenLink {
@@ -304,7 +306,7 @@ export class LiveOven implements OvenLink {
       }
       case MC.CookPlanEnded:
         this.preheatDone = false;
-        this.set({ active: false, ended: d.type === 'completed' ? 'completed' : 'cancelled', progress: null, remainingMs: null, probeTargetC: null, offer: null });
+        this.set({ active: false, ended: d.type === 'completed' ? 'completed' : 'cancelled', endedAt: Date.now(), progress: null, remainingMs: null, offer: null });
         return;
       case MC.DeviceState:
         if (d.state === 'idle') this.preheatDone = false;
@@ -312,7 +314,7 @@ export class LiveOven implements OvenLink {
         return;
       case MC.Notification:
         if (d.notification_id === 'NOTIFICATION_PREHEAT_COMPLETE') { this.preheatDone = true; this.set({}); }
-        if (d.notification_id === 'NOTIFICATION_COOK_COMPLETE') this.set({ ended: 'completed' });
+        if (d.notification_id === 'NOTIFICATION_COOK_COMPLETE' && this.s.ended !== 'completed') this.set({ ended: 'completed', endedAt: Date.now() });
         return;
       case MC.VideoFrame:
         if (typeof d.image_url === 'string') this.set({ imageUrl: rehomeMediaUrl(this.p.conn, d.image_url), imageAt: Date.now() });

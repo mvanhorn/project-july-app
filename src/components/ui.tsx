@@ -1,11 +1,12 @@
 // Shared components. Colour, type, radii and a few component choices come from
 // the active theme (src/theme/themes.ts): the July design system or Still Glass.
-import { forwardRef, useState, type ReactNode } from 'react';
+import { forwardRef, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
   type TextInputProps, type TextStyle, type ViewStyle,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { space, useTheme, type TypeName } from '@/theme';
 import { GlassFill, Gradient, StatusLine, type MarkKind } from './glass';
@@ -222,6 +223,7 @@ const styles = StyleSheet.create({
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space[4], paddingHorizontal: space[5] },
   footerInner: { width: '100%', maxWidth: 560, alignSelf: 'center', gap: space[3] },
   chip: { minHeight: 48, paddingHorizontal: space[4], borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  chipCompact: { minHeight: 36, minWidth: 56, paddingHorizontal: space[3], borderWidth: 1 },
   segment: { flexDirection: 'row', padding: 4, borderWidth: 1, gap: 4 },
   segmentItem: { flex: 1, minHeight: 48, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[5], minHeight: 56 },
@@ -229,23 +231,37 @@ const styles = StyleSheet.create({
 
 // --- Layout & controls -----------------------------------------------------
 
+function useKeyboardShown() {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setShown(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setShown(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+  return shown;
+}
+
 export function Screen({ children, footer, scroll = true }: { children: ReactNode; footer?: ReactNode; scroll?: boolean }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  // The app draws edge to edge, so Android no longer resizes the window for the
+  // keyboard: pad on both platforms so the footer rides on top of it.
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
+  const keyboard = useKeyboardShown();
   const inner = <View style={styles.screenInner}>{children}</View>;
   return (
-    <View style={{ flex: 1, backgroundColor: c.surface }}>
+    <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={headerHeight} style={{ flex: 1, backgroundColor: c.surface }}>
       {scroll ? (
         <ScrollView contentContainerStyle={{ paddingBottom: footer ? space[6] : insets.bottom + space[8] }} keyboardShouldPersistTaps="handled">
           {inner}
         </ScrollView>
       ) : inner}
       {footer ? (
-        <View style={[styles.footer, { borderTopColor: c.line, backgroundColor: c.surface, paddingBottom: insets.bottom + space[4] }]}>
+        <View style={[styles.footer, { borderTopColor: c.line, backgroundColor: c.surface, paddingBottom: (keyboard ? 0 : insets.bottom) + space[4] }]}>
           <View style={styles.footerInner}>{footer}</View>
         </View>
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -253,7 +269,11 @@ export function SectionLabel({ children }: { children: ReactNode }) {
   return <T v="label" muted accessibilityRole="header">{children}</T>;
 }
 
-export function Chip({ selected, onPress, children, accessibilityLabel }: { selected?: boolean; onPress: () => void; children: ReactNode; accessibilityLabel?: string }) {
+export function Chip({ selected, onPress, children, accessibilityLabel, compact }: {
+  selected?: boolean; onPress: () => void; children: ReactNode; accessibilityLabel?: string;
+  /** Drawn 36 px tall with a 48 px tap area (the card's add-time buttons). */
+  compact?: boolean;
+}) {
   const { c, f, r, look } = useTheme();
   return (
     <Pressable
@@ -261,8 +281,10 @@ export function Chip({ selected, onPress, children, accessibilityLabel }: { sele
       accessibilityState={{ selected: !!selected }}
       accessibilityLabel={accessibilityLabel}
       onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      hitSlop={compact ? { top: 6, bottom: 6 } : undefined}
       style={({ pressed }) => [
         styles.chip,
+        compact && styles.chipCompact,
         { borderRadius: look.glassCards ? r.sm : 9999 },
         { borderColor: selected ? c.ember : c.lineStrong, backgroundColor: selected ? c.emberSoft : pressed ? c.surfaceSunken : look.glassCards ? 'transparent' : c.surfaceRaised },
         selected && { borderWidth: 2 },
