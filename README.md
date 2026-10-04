@@ -1,6 +1,6 @@
 # Project July — mobile app
 
-The phone app for Project July ("June, local"). One Expo / React Native codebase builds the
+The phone app for Project July ("June, now local"). One Expo / React Native codebase builds the
 **iOS and Android** apps. The app talks to the oven's local `june-local`
 server over the home network, with no June cloud involved.
 

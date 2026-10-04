@@ -45,9 +45,9 @@ function Welcome() {
           <View style={[styles.markDisc, { backgroundColor: c.emberSoft }]}>
             <JulyMark size={52} color={c.ember} />
           </View>
-          <View accessible accessibilityLabel="Project July. June, local.">
+          <View accessible accessibilityLabel="Project July. June, now local.">
             <Text style={{ fontFamily: f.display, fontSize: 24, lineHeight: 30, color: c.ink }}>Project July</Text>
-            <Text style={[t.label, { color: c.ember }]}>June, local</Text>
+            <Text style={[t.label, { color: c.ember }]}>June, now local</Text>
           </View>
         </View>
         <Text accessibilityRole="header" style={[t.hero, { color: c.ink, fontSize: 48, lineHeight: 54 }]}>
