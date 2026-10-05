@@ -20,9 +20,13 @@ type Search =
 
 export default function Setup() {
   const { c, f, t } = useTheme();
-  const { startDemo, setHostTrust } = useOven();
+  const { ovens, startDemo, setHostTrust } = useOven();
+  // Adding a second (or third) oven: names by host of the ovens already paired.
+  const pairedAt = new Map(ovens.flatMap((o) => (o.paired ? [[o.paired.conn.host, o.name] as const] : [])));
+  const adding = pairedAt.size > 0;
+  const lastPhoneName = ovens.find((o) => o.paired)?.paired?.deviceName;
   const [host, setHost] = useState(`${DEFAULT_PREFIX}.`);
-  const [phoneName, setPhoneName] = useState(Platform.OS === 'ios' ? 'iPhone' : 'Android phone');
+  const [phoneName, setPhoneName] = useState(lastPhoneName ?? (Platform.OS === 'ios' ? 'iPhone' : 'Android phone'));
   const [checking, setChecking] = useState(false);
   const [result, setResult] = useState<ProbeResult | null>(null);
   const [search, setSearch] = useState<Search>({ phase: 'starting' });
@@ -34,14 +38,20 @@ export default function Setup() {
   const nameRef = useRef<TextInput>(null);
   // Once someone types an address, the search no longer fills it in.
   const typed = useRef(false);
+  // The search fills in the first oven it finds that isn't paired yet.
+  const autoPicked = useRef(false);
+  const pairedRef = useRef(pairedAt);
+  useEffect(() => { pairedRef.current = pairedAt; });
   const trustRef = useRef(trust);
   useEffect(() => { trustRef.current = trust; }, [trust]);
 
   async function check(target = clean) {
     setChecking(true);
     setResult(null);
-    // The certificate choice applies before the first HTTPS request.
-    setHostTrust(target, hasTrust(trustRef.current) ? trustRef.current : null);
+    // The certificate choice applies before the first HTTPS request. An oven already
+    // paired keeps the trust it has unless a certificate was chosen here.
+    if (hasTrust(trustRef.current)) setHostTrust(target, trustRef.current);
+    else if (!pairedRef.current.has(target)) setHostTrust(target, null);
     setResult(await probe(target));
     setChecking(false);
   }
@@ -62,7 +72,8 @@ export default function Setup() {
         onFound: (hit) => {
           found.push(hit);
           setSearch((s) => (s.phase === 'scanning' ? { ...s, found: [...found] } : s));
-          if (found.length === 1 && !typed.current) {
+          if (!autoPicked.current && !typed.current && !pairedRef.current.has(hit.host)) {
+            autoPicked.current = true;
             setHost(hit.host);
             check(hit.host);
           }
@@ -102,7 +113,7 @@ export default function Setup() {
       }
     >
       <View style={{ gap: space[2] }}>
-        <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>Connect to your oven</Text>
+        <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>{adding ? 'Add another oven' : 'Connect to your oven'}</Text>
         <T v="lead" muted>This takes about two minutes. Stand near the oven, as you’ll type a code on its screen.</T>
       </View>
 
@@ -115,7 +126,7 @@ export default function Setup() {
         </SetupStep>
       </View>
 
-      <SearchPanel search={search} current={clean} onPick={pick} onAgain={() => setSearchRun((n) => n + 1)} />
+      <SearchPanel search={search} current={clean} paired={pairedAt} onPick={pick} onAgain={() => setSearchRun((n) => n + 1)} />
 
       <Field
         ref={hostRef}
@@ -164,15 +175,23 @@ export default function Setup() {
         </Notice>
       ) : null}
       {result && !result.ok ? <Notice tone="warning" title="Couldn't find the oven">{result.message}</Notice> : null}
+      {complete && pairedAt.has(clean) ? (
+        <Notice tone="info" title={`Already paired as ${pairedAt.get(clean)}`}>Pairing again replaces it.</Notice>
+      ) : null}
 
-      <Button variant="quiet" onPress={() => { startDemo(); router.replace('/'); }}>Try the demo instead</Button>
+      {adding ? null : <Button variant="quiet" onPress={() => { startDemo(); router.replace('/'); }}>Try the demo instead</Button>}
     </Screen>
   );
 }
 
 // --- The network search -----------------------------------------------------------
 
-function SearchPanel({ search, current, onPick, onAgain }: { search: Search; current: string; onPick: (host: string) => void; onAgain: () => void }) {
+function SearchPanel({ search, current, paired, onPick, onAgain }: {
+  search: Search; current: string;
+  /** Names of ovens already paired, by address. */
+  paired: Map<string, string>;
+  onPick: (host: string) => void; onAgain: () => void;
+}) {
   const { c, f, r } = useTheme();
   if (search.phase === 'starting') return null;
   if (search.phase === 'no-network') {
@@ -212,7 +231,7 @@ function SearchPanel({ search, current, onPick, onAgain }: { search: Search; cur
             <Icon name="oven" color={on ? c.ember : c.inkMuted} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: f.mono, fontSize: 17, color: c.ink }}>{o.host}</Text>
-              <T v="small" muted>{`june-local${o.status.version ? ` ${o.status.version}` : ''}`}</T>
+              <T v="small" muted>{paired.has(o.host) ? `Paired as ${paired.get(o.host)}` : `june-local${o.status.version ? ` ${o.status.version}` : ''}`}</T>
             </View>
             {on ? <Icon name="check-circle" size={22} color={c.ember} /> : <T v="small" color={c.ember}>Use</T>}
           </Pressable>

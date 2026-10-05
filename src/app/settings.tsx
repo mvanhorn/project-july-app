@@ -13,28 +13,37 @@ import { space, THEMES, useTheme, useThemeSettings, type ThemeId } from '@/theme
 
 export default function Settings() {
   const { c, look } = useTheme();
-  const { paired, link, prefs, setUnit, setPref, forget } = useOven();
+  const { ovens, paired, link, prefs, setUnit, setPref, forget } = useOven();
   const glass = look.hero === 'glass';
   const name = useOvenName();
   const demo = !!link?.demo;
 
-  async function unpair() {
-    if (demo) { await forget(); router.replace('/'); return; }
-    const ok = await confirm(
-      'Unpair this phone?',
-      `This phone will stop controlling ${name}. You can pair again at any time with a new code.`,
-      'Unpair',
-    );
-    if (!ok) return;
+  async function leaveDemo() {
     await forget();
     router.replace('/');
   }
 
+  async function forgetOven() {
+    const ok = await confirm(
+      `Forget ${name}?`,
+      `This phone will stop controlling ${name}. You can pair again at any time with a new code.`,
+      'Forget this oven',
+    );
+    if (!ok) return;
+    const others = ovens.filter((o) => o.paired && o.id !== paired?.oven.id).length;
+    await forget();
+    // Back to the home screen: another oven if there is one, or Welcome.
+    if (others > 0 && router.canGoBack()) router.back();
+    else router.replace('/');
+  }
+
   return (
     <Screen>
+      {!demo ? <OvenList /> : null}
+
       {paired ? (
         <View style={{ gap: space[3] }}>
-          <SectionLabel>Oven</SectionLabel>
+          <SectionLabel>{name}</SectionLabel>
           <Card padded={false}>
             <Row icon="oven" label="Name" value={paired.oven.name} />
             <Divider />
@@ -48,6 +57,10 @@ export default function Settings() {
       ) : null}
 
       {paired ? <ConnectionSettings /> : null}
+
+      {paired ? (
+        <Button onPress={forgetOven} style={{ borderColor: c.fault }}>Forget this oven</Button>
+      ) : null}
 
       <View style={{ gap: space[3] }}>
         <SectionLabel>Appearance</SectionLabel>
@@ -72,7 +85,7 @@ export default function Settings() {
           onChange={(v) => setPref('cameraFps', Number(v))}
           options={CAMERA_FPS.map((v) => ({ value: String(v), label: `${v} fps` }))}
         />
-        <T v="small" muted>Up to 15 fps, powered by Project July. The stock June app showed 1 fps at most.</T>
+        <T v="small" muted>For ovens that send single pictures rather than a live stream: how often Live view fetches a new one. The stock June app showed 1 fps at most.</T>
       </View>
 
       {glass ? <HomeScreenSettings /> : null}
@@ -85,12 +98,54 @@ export default function Settings() {
         <T v="small" muted>Version {Constants.expoConfig?.version ?? '1.0.0'}</T>
       </View>
 
-      {paired || demo ? (
-        <Button onPress={unpair} style={{ borderColor: demo ? c.lineStrong : c.fault }}>
-          {demo ? 'Leave the demo' : 'Unpair this phone'}
-        </Button>
+      {demo ? (
+        <Button onPress={leaveDemo} style={{ borderColor: c.lineStrong }}>Leave the demo</Button>
       ) : null}
     </Screen>
+  );
+}
+
+/** Every paired oven: tap one to show it, or add another. */
+function OvenList() {
+  const { c } = useTheme();
+  const { ovens, currentId, select } = useOven();
+  const paired = ovens.filter((o) => o.paired);
+
+  return (
+    <View style={{ gap: space[3] }}>
+      <SectionLabel>Ovens</SectionLabel>
+      <Card padded={false}>
+        {paired.map((o) => {
+          const on = o.id === currentId;
+          return (
+            <View key={o.id}>
+              <Pressable
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                accessibilityLabel={on ? `${o.name}, showing` : `Show ${o.name}`}
+                onPress={() => select(o.id)}
+                style={({ pressed }) => [styles.oven, pressed && { backgroundColor: c.surfaceSunken }]}
+              >
+                <Icon name="oven" color={on ? c.ember : c.inkMuted} />
+                <View style={{ flex: 1 }}>
+                  <T v="bodyStrong" numberOfLines={1}>{o.name}</T>
+                  <T v="code" muted numberOfLines={1}>{o.paired?.conn.host}</T>
+                </View>
+                {on ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[1] }}>
+                    <T v="small" color={c.ember}>Showing</T>
+                    <Icon name="check-circle" size={22} color={c.ember} />
+                  </View>
+                ) : null}
+              </Pressable>
+              <Divider />
+            </View>
+          );
+        })}
+        <Row icon="plus" label={paired.length ? 'Add another oven' : 'Add an oven'} onPress={() => router.push('/setup')} />
+      </Card>
+      {paired.length > 1 ? <T v="small" muted>Swipe on the home screen to switch ovens. The settings below are for the one showing.</T> : null}
+    </View>
   );
 }
 
@@ -245,4 +300,5 @@ function ThemePicker() {
 const styles = StyleSheet.create({
   choice: { flex: 1, padding: space[3], gap: space[2] },
   swatch: { padding: space[3], gap: 4 },
+  oven: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: 64, paddingHorizontal: space[5], paddingVertical: space[3] },
 });

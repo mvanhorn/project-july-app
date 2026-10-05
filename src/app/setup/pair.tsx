@@ -12,7 +12,8 @@ import { space, useTheme } from '@/theme';
 
 export default function Pair() {
   const { c, f, t, r, look } = useTheme();
-  const { completePairing } = useOven();
+  const { ovens, completePairing } = useOven();
+  const several = ovens.filter((o) => o.paired).length > 1;
   const params = useLocalSearchParams<{ host: string; secure: string; port?: string; name: string }>();
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState<PairingStep>({ step: 'starting' });
@@ -66,7 +67,7 @@ export default function Pair() {
           </View>
           <Text accessibilityRole="header" style={[t.title, { color: c.ink, textAlign: 'center' }]}>Setup complete</Text>
           <T v="lead" muted style={{ textAlign: 'center' }}>
-            {`This phone is paired with ${step.paired.oven.name}. Only paired phones can control it.`}
+            {`This phone is paired with ${step.paired.oven.name}. Only paired phones can control it.${several ? ' Swipe on the home screen to switch ovens.' : ''}`}
           </T>
         </View>
       </Screen>
