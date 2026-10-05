@@ -219,7 +219,7 @@ async function main() {
 
 /** june-local only: the plain listener, and Live view's MJPEG stream fed by camerad's /internal/video. */
 async function plainAndCamera(paired: Paired) {
-  const plain = new LiveOven({ ...paired, conn: { host: '127.0.0.1', secure: false, port: HTTP_PORT } });
+  const plain = new LiveOven({ ...paired, conn: { host: '127.0.0.1', secure: false, httpPort: HTTP_PORT } });
   plain.start();
   await until('plain link online', () => plain.snapshot().link === 'online');
   console.log(`✓ the same pairing works over the plain listener (:${HTTP_PORT} here, :80 on the oven)`);

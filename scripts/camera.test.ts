@@ -38,20 +38,22 @@ const part = (j: Uint8Array) => Buffer.concat([
 
 // --- endpoint URLs -------------------------------------------------------------
 {
-  const plain = urls({ host: '192.168.1.75', secure: false });
+  const plain = urls({ host: '192.168.1.75', secure: false, httpPort: 80 });
   assert.equal(plain.base, 'http://192.168.1.75');
   assert.equal(plain.ws, 'ws://192.168.1.75/1/messaging/websocket/companion');
   assert.equal(plain.statusPage, 'http://192.168.1.75/local');
   assert.equal(plain.stream, 'http://192.168.1.75/media/stream.mjpg');
-  assert.equal(urls({ host: 'june.local', secure: false, port: 8080 }).base, 'http://june.local:8080');
-  const tls = urls({ host: 'june.local', secure: true, port: 8080 });
+  assert.equal(urls({ host: 'june.local', secure: false, httpPort: 8080 }).base, 'http://june.local:8080');
+  // Pairings made before the port was recorded used the reference server's 8080.
+  assert.equal(urls({ host: 'june.local', secure: false }).base, 'http://june.local:8080');
+  const tls = urls({ host: 'june.local', secure: true, httpPort: 8080 });
   assert.equal(tls.base, 'https://june.local');
   assert.equal(tls.statusPage, 'http://june.local:8080/local');
   assert.equal(urls({ host: '127.0.0.1:18443', secure: true }).ws, 'wss://127.0.0.1:18443/1/messaging/websocket/companion');
   for (const typed of ['june.local', 'http://june.local/', 'https://june.local:443', 'june.local:80', ' june.local:8080/local ']) {
     assert.equal(normalizeHost(typed), 'june.local', typed);
   }
-  console.log('✓ plain connections use :80 (no port in the URL) unless told otherwise');
+  console.log('✓ plain :80 needs no port in the URL; other plain ports are spelled out');
 }
 
 // --- parser --------------------------------------------------------------------
@@ -126,7 +128,7 @@ const server = createServer((req, res: ServerResponse) => {
 });
 
 const paired = (port: number) => ({
-  conn: { host: '127.0.0.1', secure: false, port }, deviceId: 'phone', deviceName: 'Test phone', password: '',
+  conn: { host: '127.0.0.1', secure: false, httpPort: port }, deviceId: 'phone', deviceName: 'Test phone', password: '',
   accessToken: 'token', refreshToken: '', keys: generateKeys(), oven: { id: 'oven' }, pairedAt: 0,
 }) as Paired;
 

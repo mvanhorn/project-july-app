@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
-import { AppState, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useFocusEffect } from 'expo-router';
 import { show } from '@/api/modes';
 import { Icon } from '@/components/Icon';
 import { pillState, useNow } from '@/components/OvenHero';
 import { Notice, Screen, StatusPill, T } from '@/components/ui';
+import { useCameraFeed } from '@/components/useCameraFeed';
 import { useOven } from '@/state/oven';
 import { space, useTheme } from '@/theme';
 
@@ -14,20 +15,14 @@ const DEMO_IMAGE = require('../../assets/demo-camera.jpg');
 export default function Camera() {
   const { c, f, r } = useTheme();
   const { link, snap: s, prefs } = useOven();
-  const [src, setSrc] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
   const [lastFrame, setLastFrame] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const now = useNow(true);
 
-  // While this screen is open: keep the camera awake and pull stills at the chosen rate.
-  const frameMs = Math.max(60, 1000 / prefs.cameraFps);
-  useFocusEffect(useCallback(() => {
-    if (!link) return;
-    link.cameraOn(120);
-    const wake = setInterval(() => link.cameraOn(120), 100_000);
-    const pull = link.demo ? null : setInterval(() => setSrc(link.latestImageUrl()), frameMs);
-    return () => { clearInterval(wake); if (pull) clearInterval(pull); };
-  }, [link, frameMs]));
+  // Watch the camera while this screen is open.
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
+  const src = useCameraFeed(focused);
 
   const frameAt = link?.demo ? s.imageAt : lastFrame;
   const age = frameAt ? Math.round((now - frameAt) / 1000) : null;

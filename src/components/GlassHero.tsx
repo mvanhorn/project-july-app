@@ -115,7 +115,7 @@ function model(s: OvenSnapshot, unit: Unit, left: number | null, now: number, do
   }
   if (s.probeC !== null) {
     return {
-      ...base, state: 'cooking', mark: 'cooking', word: 'Cooking', q: 'food', hero: `${show(s.probeC, unit)}°`, bar: ['heat', s.progress ?? 1],
+      ...base, state: 'cooking', mark: 'cooking', word: 'Cooking', q: s.probeTargetC !== null ? `food · target ${show(s.probeTargetC, unit)}°` : 'food', hero: `${show(s.probeC, unit)}°`, bar: ['heat', s.progress ?? 1],
       a: `${label}${target ? ` at ${target} ${u}` : ''}`, b: s.elapsedMs !== null ? `Cooking for ${Math.round(elapsed / 60_000)} min` : '',
     };
   }

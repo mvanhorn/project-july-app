@@ -65,9 +65,10 @@ export interface OvenLink {
   respondToOffer(accept: boolean): Promise<void>;
   /**
    * Live camera pictures while a screen is watching: calls `onFrame` with an
-   * image URI for each new picture. Returns a function that stops watching.
+   * image URI for each new picture. `stillMs` paces the stills fallback on a
+   * server without the stream. Returns a function that stops watching.
    */
-  watchCamera(onFrame: (uri: string) => void): () => void;
+  watchCamera(onFrame: (uri: string) => void, stillMs?: number): () => void;
   unpair(): Promise<void>;
 }
 
@@ -306,7 +307,7 @@ export class LiveOven implements OvenLink {
       }
       case MC.CookPlanEnded:
         this.preheatDone = false;
-        this.set({ active: false, ended: d.type === 'completed' ? 'completed' : 'cancelled', endedAt: Date.now(), progress: null, remainingMs: null, offer: null });
+        this.set({ active: false, ended: d.type === 'completed' ? 'completed' : 'cancelled', endedAt: Date.now(), progress: null, remainingMs: null, probeTargetC: null, offer: null });
         return;
       case MC.DeviceState:
         if (d.state === 'idle') this.preheatDone = false;
@@ -394,7 +395,7 @@ export class LiveOven implements OvenLink {
     this.set({ offer: null });
   }
 
-  watchCamera(onFrame: (uri: string) => void): () => void {
+  watchCamera(onFrame: (uri: string) => void, stillMs = 1000): () => void {
     const ctl = new AbortController();
     let stopPolling: (() => void) | null = null;
     const headers = { Authorization: `Bearer ${this.p.accessToken}`, 'User-Agent': USER_AGENT };
@@ -420,18 +421,18 @@ export class LiveOven implements OvenLink {
         if (!got && ++misses >= 2) break;
         await wait(2000);
       }
-      if (!ctl.signal.aborted) stopPolling = this.pollStills(onFrame);
+      if (!ctl.signal.aborted) stopPolling = this.pollStills(onFrame, stillMs);
     })();
 
     return () => { ctl.abort(); stopPolling?.(); };
   }
 
-  /** Fallback live view: keep the camera awake and fetch the latest still once a second (its cadence). */
-  private pollStills(onFrame: (uri: string) => void): () => void {
+  /** Fallback live view: keep the camera awake and fetch the latest still every `ms`. */
+  private pollStills(onFrame: (uri: string) => void, ms: number): () => void {
     const on = () => rest(this.p.conn, 'POST', '/internal/camera/on?seconds=120', { token: this.p.accessToken }).catch(() => {});
     on();
     const wake = setInterval(on, 100_000);
-    const pull = setInterval(() => onFrame(`${urls(this.p.conn).latestImage}?ts=${Date.now()}`), 1000);
+    const pull = setInterval(() => onFrame(`${urls(this.p.conn).latestImage}?ts=${Date.now()}`), Math.max(60, ms));
     return () => {
       clearInterval(wake);
       clearInterval(pull);

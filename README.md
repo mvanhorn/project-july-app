@@ -22,7 +22,7 @@ Light / Dark):
   opens a floating window over the tile. Starting goes through a review with a slider
   and a typed temperature, which warns the oven must be empty and closes itself after
   5 minutes.
-- **July** is the original July Oven design system (`../../design-system`): warm
+- **July** is the original July Oven design system: warm
   neutrals, one ember accent, Fraunces / Public Sans / IBM Plex Mono, and soft cards.
 
 Both use 18px body text and touch targets of 48px or more, and meet WCAG AA contrast.

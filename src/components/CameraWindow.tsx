@@ -1,7 +1,5 @@
-// The camera window: floats over the glass card with the oven's camera at the chosen
-// frame rate and × to close (july-oven-card.js, cameraSheet). Unlike the Home
-// Assistant card, the phone can wake the camera, so it asks the oven to turn it on
-// while the window is open.
+// The camera window: floats over the glass card with the oven's live camera and ×
+// to close (july-oven-card.js, cameraSheet). Watching keeps the oven's camera on.
 import { useEffect, useState } from 'react';
 import { BackHandler, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -10,27 +8,17 @@ import { useOven } from '@/state/oven';
 import { useTheme } from '@/theme';
 import { Gradient } from './glass';
 import { useNow } from './OvenHero';
+import { useCameraFeed } from './useCameraFeed';
 
 const DEMO_IMAGE = require('../../assets/demo-camera.jpg');
 
 export function CameraWindow({ name, heating, onClose }: { name: string; heating: boolean; onClose: () => void }) {
   const { f } = useTheme();
-  const { link, prefs } = useOven();
-  const [src, setSrc] = useState<string | null>(null);
+  const { link } = useOven();
+  const src = useCameraFeed();
   const [shownAt, setShownAt] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const now = useNow(true);
-
-  // Keep the camera awake and pull pictures at the chosen rate while the window is open.
-  useEffect(() => {
-    if (!link) return;
-    link.cameraOn(120);
-    const wake = setInterval(() => link.cameraOn(120), 100_000);
-    const ms = Math.max(60, 1000 / prefs.cameraFps);
-    const pull = link.demo ? null : setInterval(() => setSrc(link.latestImageUrl()), ms);
-    const first = link.demo ? null : setTimeout(() => setSrc(link.latestImageUrl()), 0);
-    return () => { clearInterval(wake); if (pull) clearInterval(pull); if (first) clearTimeout(first); };
-  }, [link, prefs.cameraFps]);
 
   // Back on Android, and Escape on the web, close the window.
   useEffect(() => {
