@@ -1,7 +1,7 @@
 // Drawing pieces for the Still Glass theme, ported from the Home Assistant July
 // Oven card (july-oven-card.js): gradient fills, status marks, mode glyphs and
 // the glowing mode tiles. Gradients are drawn with react-native-svg.
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Defs, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
@@ -9,18 +9,43 @@ import { useTheme } from '@/theme';
 
 const useSvgId = (p: string) => p + useId().replace(/[^a-zA-Z0-9]/g, '');
 
+/**
+ * Fills its parent with an SVG drawn at the measured size. A "100%" SVG can keep
+ * the size it first saw on Android (a button's gradient stopped short of its right
+ * edge), so the SVG gets exact pixels from a layer that does follow the parent.
+ */
+function Fill({ style, children }: { style?: ViewStyle; children: (w: number, h: number) => ReactNode }) {
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  return (
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, style]}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize((s) => (s && s.w === width && s.h === height ? s : { w: width, h: height }));
+      }}
+    >
+      {size && size.w > 0 && size.h > 0 ? children(size.w, size.h) : null}
+    </View>
+  );
+}
+
 /** A linear gradient filling its parent (the parent clips it with overflow: hidden). */
 export function Gradient({ colors, locations, horizontal, style }: { colors: string[]; locations?: number[]; horizontal?: boolean; style?: ViewStyle }) {
   const id = useSvgId('g');
   return (
-    <Svg style={[StyleSheet.absoluteFill, style]} width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2={horizontal ? '1' : '0'} y2={horizontal ? '0' : '1'}>
-          {colors.map((c, i) => <Stop key={i} offset={locations?.[i] ?? i / Math.max(1, colors.length - 1)} stopColor={c} />)}
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
+    <Fill style={style}>
+      {(w, h) => (
+        <Svg width={w} height={h}>
+          <Defs>
+            <LinearGradient id={id} x1="0" y1="0" x2={horizontal ? '1' : '0'} y2={horizontal ? '0' : '1'}>
+              {colors.map((c, i) => <Stop key={i} offset={locations?.[i] ?? i / Math.max(1, colors.length - 1)} stopColor={c} />)}
+            </LinearGradient>
+          </Defs>
+          <Rect width={w} height={h} fill={`url(#${id})`} />
+        </Svg>
+      )}
+    </Fill>
   );
 }
 
@@ -30,22 +55,26 @@ export function GlassFill() {
   const base = useSvgId('b');
   const sheen = useSvgId('s');
   return (
-    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none">
-      <Defs>
-        <LinearGradient id={base} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={c.cardTop} />
-          <Stop offset="1" stopColor={c.cardBottom} />
-        </LinearGradient>
-        {/* 112° in CSS: a narrow light band two thirds of the way across. */}
-        <LinearGradient id={sheen} x1="0" y1="0.3" x2="1" y2="0.7">
-          <Stop offset="0.63" stopColor={c.sheen} stopOpacity="0" />
-          <Stop offset="0.634" stopColor={c.sheen} />
-          <Stop offset="0.84" stopColor={c.sheen} stopOpacity="0" />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${base})`} />
-      <Rect width="100%" height="100%" fill={`url(#${sheen})`} />
-    </Svg>
+    <Fill>
+      {(w, h) => (
+        <Svg width={w} height={h}>
+          <Defs>
+            <LinearGradient id={base} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={c.cardTop} />
+              <Stop offset="1" stopColor={c.cardBottom} />
+            </LinearGradient>
+            {/* 112° in CSS: a narrow light band two thirds of the way across. */}
+            <LinearGradient id={sheen} x1="0" y1="0.3" x2="1" y2="0.7">
+              <Stop offset="0.63" stopColor={c.sheen} stopOpacity="0" />
+              <Stop offset="0.634" stopColor={c.sheen} />
+              <Stop offset="0.84" stopColor={c.sheen} stopOpacity="0" />
+            </LinearGradient>
+          </Defs>
+          <Rect width={w} height={h} fill={`url(#${base})`} />
+          <Rect width={w} height={h} fill={`url(#${sheen})`} />
+        </Svg>
+      )}
+    </Fill>
   );
 }
 
