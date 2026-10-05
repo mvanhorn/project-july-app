@@ -12,16 +12,18 @@ Light / Dark):
   It uses Barlow Semi Condensed / Barlow Condensed type and the oven's black glass in dark.
   The oven tile follows the card's layout (v0.4.1): the oven's icon as its lamp (orange
   while heating) with its name and a one-tap red Stop, a big number with a status mark
-  (↑ preheating, ✓ ready, flame cooking), the heat line, a 4:3 camera and +1/+5/+10
-  buttons. When the oven is off it shows the home screen: an oven-sized clock, the last
-  cook with **Repeat** (which opens its review with the same mode and temperature), and
-  glowing mode tiles four across with Camera last; Settings is in the top bar. It sizes
-  itself to the phone: the big clock if every row fits, a smaller clock to make them
-  fit, and only then pages you swipe (with page dots you can also tap). Modes not yet
-  started on a real oven carry a "?". The name tucks into the icon after 5 s. Camera
-  opens a floating window over the tile. Starting goes through a review with a slider
-  and a typed temperature, which warns the oven must be empty and closes itself after
-  5 minutes.
+  (↑ preheating, ✓ ready, flame cooking), the heat line and +1/+5/+10 buttons. While
+  the oven is on, the camera is its own full-width tile below, with Full screen, Save
+  (to Photos) and Share in its corner. When the oven is off the app shows the oven's
+  home screen, drawn on the app itself rather than in a card: an oven-sized clock, the
+  last cook with **Repeat** (which opens its review with the same mode and
+  temperature), and glowing mode tiles four across with Camera last; Settings is in the
+  top bar. It sizes itself to the phone: the big clock if every row fits, a smaller
+  clock to make them fit, and only then does the screen scroll. With several ovens,
+  each is a page you swipe to (or pick with the dots under the top bar). Modes not yet
+  started on a real oven carry a "?". The name tucks into the icon after 5 s. Starting
+  goes through a review with a slider and a typed temperature, which warns the oven
+  must be empty and closes itself after 5 minutes.
 - **July** is the original July Oven design system: warm
   neutrals, one ember accent, Fraunces / Public Sans / IBM Plex Mono, and soft cards.
 
@@ -36,15 +38,16 @@ Colours, fonts, type scale and component choices for each theme live in
 | **Welcome** | What Project July is, then *Set up this phone* or *Try the demo first*. |
 | **Set up** | Finds the oven on the home network (or takes a typed address), checks the server (HTTPS first, then the plain listener on port 80 or 8080), optionally takes the home `ca.crt`, and names this phone. |
 | **Pair** | Shows the eight-digit code to type on the oven's Connect screen, with a countdown, then runs the SRP key exchange. |
-| **Oven** | Live camera still, large temperature readout, status pill, preheat progress, timer countdown and probe reading. Controls for target temperature, timer and *Stop cooking*. |
+| **Oven** | One page per paired oven; swipe (or tap the dots) to switch. Large temperature readout, status, preheat progress, timer countdown and probe reading, and while it's on, a full-width live camera tile with Full screen, Save and Share. Controls for target temperature, timer and *Stop cooking*. |
 | **Start a cook** | Mode, temperature and an optional timer. Bake is proven on a real oven; Roast, Air fry and Broil are names the Home Assistant integration sends. Toast, Pizza, Reheat, Keep warm, Dehydrate, Proof and Slow cook are marked untested: some (Proof, likely Toast) are programs on the oven, which may not start by name. |
-| **Live view** | Camera stills at the chosen frame rate: 1, 5, 10 or 15 per second, 15 by default (1 is the stock June app's rate). Keeps the camera awake while open. |
-| **Settings** | Theme and light/dark, oven details, connection, °F/°C, camera frame rate, server status page, and unpairing. With Still Glass, also the home screen choices from the Home Assistant card: the name tucking into the icon, cook modes in the oven's order or most used first (in pages, or all on one), and a 12/24-hour clock. The oven's icon is always the June oven. |
+| **Live view** | The camera full screen, with Save (to Photos) and Share. Reads june-local's MJPEG stream; on a server without it, stills at the chosen frame rate (1, 5, 10 or 15 per second). Keeps the camera awake while open. |
+| **Settings** | Theme and light/dark, the paired ovens (show one, add another), the current oven's details, connection and *Forget this oven*, °F/°C, camera frame rate and server status page. With Still Glass, also the home screen choices from the Home Assistant card: the name tucking into the icon, cook modes in the oven's order or most used first, and a 12/24-hour clock. The oven's icon is always the June oven. |
 
 The demo mode is a simulated oven, always labelled *Demo*, so people can try
 the app (and designers can review it) without an oven. In a web dev build
 (`npx expo start --web`), `?demo` opens it straight away, and
-`?demo=preheat|ready|cooking|probe|done|offline` starts it in that state.
+`?demo=preheat|ready|cooking|probe|done|offline` starts it in that state, and
+`&ovens=2` (up to 5) adds idle demo ovens to swipe between.
 
 ## How it talks to the oven
 
@@ -280,7 +283,9 @@ scripts/          protocol and integration tests
   app to owners.
 - Changing the temperature mid-cook tries `11005`. If the oven refuses, the app
   restarts the cook at the new temperature, as the Home Assistant integration does.
-- No recipes or guided programs yet, and one oven per phone. The installer can
+- A phone can pair with several ovens, and you swipe between them on the home
+  screen. Each one is still found and paired on its own, with its own code.
+- No recipes or guided programs yet. The installer can
   now put June's presets content on the oven (not in the public payload), which
   Proof and Slow Cook load on the oven. Starting those from the phone with
   `11002` is unverified: the Home Assistant integration offers only Bake, Roast,

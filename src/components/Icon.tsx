@@ -5,7 +5,7 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
 export type IconName =
   | 'oven' | 'thermometer' | 'camera' | 'house' | 'wifi' | 'check-circle'
   | 'timer' | 'flame' | 'stop' | 'plus' | 'minus' | 'chevron-right' | 'chevron-left' | 'chevron-down' | 'chevron-up'
-  | 'gear' | 'probe' | 'light' | 'link' | 'alert';
+  | 'gear' | 'probe' | 'light' | 'link' | 'alert' | 'expand' | 'close' | 'download' | 'share';
 
 export function Icon({ name, size = 24, color }: { name: IconName; size?: number; color: string }) {
   const s = { stroke: color, strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' };
@@ -90,6 +90,14 @@ function glyph(name: IconName, s: object, color: string) {
         <Path d="M12 9.5v4" {...s} />
         <Circle cx={12} cy={16.6} r={0.9} fill={color} />
       </>);
+    case 'expand':
+      return <Path d="M14.5 4.5h5v5M19.5 4.5 14 10M9.5 19.5h-5v-5M4.5 19.5 10 14" {...s} />;
+    case 'close':
+      return <Path d="M6.5 6.5l11 11M17.5 6.5l-11 11" {...s} />;
+    case 'download':
+      return <Path d="M12 4.5v10.5M7.5 10.5 12 15l4.5-4.5M5 19.5h14" {...s} />;
+    case 'share':
+      return <Path d="M12 14.5V4.5M8 8.5l4-4 4 4M7.5 11.5H6a1.5 1.5 0 0 0-1.5 1.5v5.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V13a1.5 1.5 0 0 0-1.5-1.5h-1.5" {...s} />;
   }
 }
 
