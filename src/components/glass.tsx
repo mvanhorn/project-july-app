@@ -10,6 +10,18 @@ import { useTheme } from '@/theme';
 const useSvgId = (p: string) => p + useId().replace(/[^a-zA-Z0-9]/g, '');
 
 /**
+ * A gradient stop's colour and opacity. On iOS and Android react-native-svg
+ * replaces a stop colour's own alpha with stopOpacity, so the card's 4% white
+ * sheen drew as solid white. Split rgba() into a colour and an opacity.
+ */
+export function stopOf(color: string, opacity = 1): { stopColor: string; stopOpacity: number } {
+  if (color === 'transparent') return { stopColor: '#000000', stopOpacity: 0 };
+  const m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(color);
+  if (!m) return { stopColor: color, stopOpacity: opacity };
+  return { stopColor: `rgb(${m[1]},${m[2]},${m[3]})`, stopOpacity: opacity * (m[4] === undefined ? 1 : Number(m[4])) };
+}
+
+/**
  * Fills its parent with an SVG drawn at the measured size. A "100%" SVG can keep
  * the size it first saw on Android (a button's gradient stopped short of its right
  * edge), so the SVG gets exact pixels from a layer that does follow the parent.
@@ -39,7 +51,7 @@ export function Gradient({ colors, locations, horizontal, style }: { colors: str
         <Svg width={w} height={h}>
           <Defs>
             <LinearGradient id={id} x1="0" y1="0" x2={horizontal ? '1' : '0'} y2={horizontal ? '0' : '1'}>
-              {colors.map((c, i) => <Stop key={i} offset={locations?.[i] ?? i / Math.max(1, colors.length - 1)} stopColor={c} />)}
+              {colors.map((c, i) => <Stop key={i} offset={locations?.[i] ?? i / Math.max(1, colors.length - 1)} {...stopOf(c)} />)}
             </LinearGradient>
           </Defs>
           <Rect width={w} height={h} fill={`url(#${id})`} />
@@ -60,14 +72,14 @@ export function GlassFill() {
         <Svg width={w} height={h}>
           <Defs>
             <LinearGradient id={base} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={c.cardTop} />
-              <Stop offset="1" stopColor={c.cardBottom} />
+              <Stop offset="0" {...stopOf(c.cardTop)} />
+              <Stop offset="1" {...stopOf(c.cardBottom)} />
             </LinearGradient>
             {/* 112° in CSS: a narrow light band two thirds of the way across. */}
             <LinearGradient id={sheen} x1="0" y1="0.3" x2="1" y2="0.7">
-              <Stop offset="0.63" stopColor={c.sheen} stopOpacity="0" />
-              <Stop offset="0.634" stopColor={c.sheen} />
-              <Stop offset="0.84" stopColor={c.sheen} stopOpacity="0" />
+              <Stop offset="0.63" {...stopOf(c.sheen, 0)} />
+              <Stop offset="0.634" {...stopOf(c.sheen)} />
+              <Stop offset="0.84" {...stopOf(c.sheen, 0)} />
             </LinearGradient>
           </Defs>
           <Rect width={w} height={h} fill={`url(#${base})`} />
@@ -235,17 +247,17 @@ export function ModeTile({ mode, label, size, onPress, util, selected, accessibi
         <Svg width={size} height={size}>
           <Defs>
             <LinearGradient id={face} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={a} />
-              <Stop offset="1" stopColor={b} />
+              <Stop offset="0" {...stopOf(a)} />
+              <Stop offset="1" {...stopOf(b)} />
             </LinearGradient>
             <RadialGradient id={glowId} cx="50%" cy="100%" rx="60%" ry="37.5%" fx="50%" fy="100%">
-              <Stop offset="0" stopColor={util ? 'transparent' : c.tileGlow} />
-              <Stop offset="1" stopColor={util ? 'transparent' : c.tileGlow} stopOpacity="0" />
+              <Stop offset="0" {...stopOf(util ? 'transparent' : c.tileGlow)} />
+              <Stop offset="1" {...stopOf(util ? 'transparent' : c.tileGlow, 0)} />
             </RadialGradient>
             <LinearGradient id={sheenId} x1="0" y1="0.2" x2="1" y2="0.8">
-              <Stop offset="0.56" stopColor={c.tileSheen} stopOpacity="0" />
-              <Stop offset="0.565" stopColor={c.tileSheen} stopOpacity="0.7" />
-              <Stop offset="0.78" stopColor={c.tileSheen} stopOpacity="0" />
+              <Stop offset="0.56" {...stopOf(c.tileSheen, 0)} />
+              <Stop offset="0.565" {...stopOf(c.tileSheen, 0.7)} />
+              <Stop offset="0.78" {...stopOf(c.tileSheen, 0)} />
             </LinearGradient>
           </Defs>
           <Rect width={size} height={size} rx={rx} fill={`url(#${face})`} />
