@@ -1,15 +1,18 @@
 // Find june-local on the home network. The oven doesn't announce itself (no mDNS
 // or broadcast; june-local's own docs say so), so the phone asks every address on
-// its Wi-Fi network (the /24 it is on) for june-local's status page, on both of
-// its plain ports. A few seconds, since most addresses don't answer at all.
+// its Wi-Fi network (the /24 it is on) for june-local's status page: port 80 (the
+// oven) first, then 8080 (the reference server) if nothing answered. See scan.ts
+// for why it is one port at a time.
 import { Platform } from 'react-native';
 import * as Network from 'expo-network';
-import { findJuneLocal, type LocalStatus } from './endpoint';
+import { PLAIN_PORTS, statusAt } from './endpoint';
+import { sweep, type Found } from './scan';
 
-export type Found = { host: string; httpPort: number; status: LocalStatus };
+export type { Found };
 
-const PARALLEL = 48;
-const WAIT_MS = 1500;
+// Under OkHttp's 64 requests in flight, leaving room for anything else the app sends.
+const PARALLEL = 40;
+const WAIT_MS = 2000;
 
 /** A private home-network address (10/8, 172.16/12, 192.168/16): the only kind the scan may look through. */
 export function isPrivateIPv4(ip: string): boolean {
@@ -44,23 +47,11 @@ export async function scan(prefix: string, opts: {
 }): Promise<Found[]> {
   // Never look through anything but a private home network.
   if (!isPrivateIPv4(`${prefix}.1`)) return [];
-  const total = 254;
-  const found: Found[] = [];
-  let next = 1;
-  let done = 0;
-  const worker = async () => {
-    while (next <= total && !opts.signal?.aborted) {
-      const host = `${prefix}.${next++}`;
-      const hit = await findJuneLocal(host, WAIT_MS);
-      if (opts.signal?.aborted) return;
-      opts.onProgress?.(++done, total);
-      if (hit) {
-        const f = { host, ...hit };
-        found.push(f);
-        opts.onFound?.(f);
-      }
-    }
-  };
-  await Promise.all(Array.from({ length: PARALLEL }, worker));
-  return found;
+  return sweep(prefix, PLAIN_PORTS, statusAt, {
+    parallel: PARALLEL,
+    timeoutMs: WAIT_MS,
+    onProgress: (done, total) => opts.onProgress?.(done, total),
+    onFound: opts.onFound,
+    signal: opts.signal,
+  });
 }

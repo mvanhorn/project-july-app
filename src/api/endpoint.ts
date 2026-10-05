@@ -95,9 +95,8 @@ export async function probe(host: string): Promise<ProbeResult> {
   };
 }
 
-/** The address of a june-local server: plain HTTP on either port, used by the network scan. */
-export async function findJuneLocal(ip: string, ms: number): Promise<{ httpPort: number; status: LocalStatus } | null> {
-  const found = await Promise.all(PLAIN_PORTS.map((port) => localStatus(plainBase(ip, port), ms)));
-  const at = found.findIndex((s) => s !== null && s !== 'other');
-  return at >= 0 ? { httpPort: PLAIN_PORTS[at], status: found[at] as LocalStatus } : null;
+/** june-local's status on one plain port of an address, or null: one request, for the network scan. */
+export async function statusAt(ip: string, port: number, ms: number): Promise<LocalStatus | null> {
+  const s = await localStatus(plainBase(ip, port), ms);
+  return s && s !== 'other' ? s : null;
 }
