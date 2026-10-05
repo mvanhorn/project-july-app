@@ -79,7 +79,7 @@ function Welcome() {
 // view is the current oven, which Settings, Start a cook and Live view act on.
 
 function Dashboard() {
-  const { c, f, t } = useTheme();
+  const { c, f, t, look } = useTheme();
   const { ovens, currentId, select, link } = useOven();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -116,9 +116,12 @@ function Dashboard() {
       </View>
 
       {many ? (
-        // Swiping is never the only way: each dot is a 48 px button.
-        <View style={styles.switcher}>
-          <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: f.sansStrong, fontSize: 16, color: c.ink }}>{ovens[index]?.name}</Text>
+        // Swiping is never the only way: each dot is a 48 px button. The July page
+        // already has the oven's name as its title, so there the dots stand alone.
+        <View style={[styles.switcher, look.hero !== 'glass' && { justifyContent: 'center' }]}>
+          {look.hero === 'glass' ? (
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: f.sansStrong, fontSize: 16, color: c.ink }}>{ovens[index]?.name}</Text>
+          ) : null}
           <View style={{ flexDirection: 'row' }}>
             {ovens.map((o, i) => (
               <Pressable
