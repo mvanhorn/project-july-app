@@ -1,26 +1,63 @@
 // Drawing pieces for the Still Glass theme, ported from the Home Assistant July
 // Oven card (july-oven-card.js): gradient fills, status marks, mode glyphs and
 // the glowing mode tiles. Gradients are drawn with react-native-svg.
-import { useId, type ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { AccessibilityInfo, Animated, Platform, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Defs, G, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useTheme } from '@/theme';
 
 const useSvgId = (p: string) => p + useId().replace(/[^a-zA-Z0-9]/g, '');
 
+/**
+ * A gradient stop's colour and opacity. On iOS and Android react-native-svg
+ * replaces a stop colour's own alpha with stopOpacity, so the card's 4% white
+ * sheen drew as solid white. Split rgba() into a colour and an opacity.
+ */
+export function stopOf(color: string, opacity = 1): { stopColor: string; stopOpacity: number } {
+  if (color === 'transparent') return { stopColor: '#000000', stopOpacity: 0 };
+  const m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(color);
+  if (!m) return { stopColor: color, stopOpacity: opacity };
+  return { stopColor: `rgb(${m[1]},${m[2]},${m[3]})`, stopOpacity: opacity * (m[4] === undefined ? 1 : Number(m[4])) };
+}
+
+/**
+ * Fills its parent with an SVG drawn at the measured size. A "100%" SVG can keep
+ * the size it first saw on Android (a button's gradient stopped short of its right
+ * edge), so the SVG gets exact pixels from a layer that does follow the parent.
+ */
+function Fill({ style, children }: { style?: ViewStyle; children: (w: number, h: number) => ReactNode }) {
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  return (
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, style]}
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        setSize((s) => (s && s.w === width && s.h === height ? s : { w: width, h: height }));
+      }}
+    >
+      {size && size.w > 0 && size.h > 0 ? children(size.w, size.h) : null}
+    </View>
+  );
+}
+
 /** A linear gradient filling its parent (the parent clips it with overflow: hidden). */
 export function Gradient({ colors, locations, horizontal, style }: { colors: string[]; locations?: number[]; horizontal?: boolean; style?: ViewStyle }) {
   const id = useSvgId('g');
   return (
-    <Svg style={[StyleSheet.absoluteFill, style]} width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2={horizontal ? '1' : '0'} y2={horizontal ? '0' : '1'}>
-          {colors.map((c, i) => <Stop key={i} offset={locations?.[i] ?? i / Math.max(1, colors.length - 1)} stopColor={c} />)}
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
+    <Fill style={style}>
+      {(w, h) => (
+        <Svg width={w} height={h}>
+          <Defs>
+            <LinearGradient id={id} x1="0" y1="0" x2={horizontal ? '1' : '0'} y2={horizontal ? '0' : '1'}>
+              {colors.map((c, i) => <Stop key={i} offset={locations?.[i] ?? i / Math.max(1, colors.length - 1)} {...stopOf(c)} />)}
+            </LinearGradient>
+          </Defs>
+          <Rect width={w} height={h} fill={`url(#${id})`} />
+        </Svg>
+      )}
+    </Fill>
   );
 }
 
@@ -30,22 +67,26 @@ export function GlassFill() {
   const base = useSvgId('b');
   const sheen = useSvgId('s');
   return (
-    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none" pointerEvents="none">
-      <Defs>
-        <LinearGradient id={base} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={c.cardTop} />
-          <Stop offset="1" stopColor={c.cardBottom} />
-        </LinearGradient>
-        {/* 112° in CSS: a narrow light band two thirds of the way across. */}
-        <LinearGradient id={sheen} x1="0" y1="0.3" x2="1" y2="0.7">
-          <Stop offset="0.63" stopColor={c.sheen} stopOpacity="0" />
-          <Stop offset="0.634" stopColor={c.sheen} />
-          <Stop offset="0.84" stopColor={c.sheen} stopOpacity="0" />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill={`url(#${base})`} />
-      <Rect width="100%" height="100%" fill={`url(#${sheen})`} />
-    </Svg>
+    <Fill>
+      {(w, h) => (
+        <Svg width={w} height={h}>
+          <Defs>
+            <LinearGradient id={base} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" {...stopOf(c.cardTop)} />
+              <Stop offset="1" {...stopOf(c.cardBottom)} />
+            </LinearGradient>
+            {/* 112° in CSS: a narrow light band two thirds of the way across. */}
+            <LinearGradient id={sheen} x1="0" y1="0.3" x2="1" y2="0.7">
+              <Stop offset="0.63" {...stopOf(c.sheen, 0)} />
+              <Stop offset="0.634" {...stopOf(c.sheen)} />
+              <Stop offset="0.84" {...stopOf(c.sheen, 0)} />
+            </LinearGradient>
+          </Defs>
+          <Rect width={w} height={h} fill={`url(#${base})`} />
+          <Rect width={w} height={h} fill={`url(#${sheen})`} />
+        </Svg>
+      )}
+    </Fill>
   );
 }
 
@@ -108,34 +149,118 @@ export function StatusLine({ kind, word, qualifier, size = 'normal' }: { kind: M
 }
 
 // --- Mode glyphs: the heating elements each mode uses -----------------------------
-// bake, broil, roast, toast, airfry and settings are the card's own; the rest are
+// bake, broil, roast, toast, airfry, camera and settings are the card's own; the rest are
 // drawn to the same rules (48 box, 4 px stroke, 3 px for thin parts).
 
-export function ModeGlyph({ mode, color, size, glow }: { mode: string; color: string; size: number; glow?: string }) {
-  const body = glyphBody(mode, color, 4, 3);
+export function ModeGlyph({ mode, color, size, glow, fan }: {
+  mode: string; color: string; size: number; glow?: string;
+  /** Air fry only: the fan's turn, drawn on its own layer so it can spin. */
+  fan?: Animated.Value;
+}) {
   // The card glows its glyphs with drop-shadow filters; wide faint strokes under the
   // crisp ones give the same halo on every platform.
+  const layers = (m: string) => (<>
+    {glow ? <G opacity={0.12}>{glyphBody(m, glow, 12, 11)}</G> : null}
+    {glow ? <G opacity={0.2}>{glyphBody(m, glow, 9, 8)}</G> : null}
+    {glow ? <G opacity={0.3}>{glyphBody(m, glow, 6.5, 5.5)}</G> : null}
+    {glyphBody(m, color, 4, 3)}
+  </>);
+  if (mode === 'airfry' && fan) {
+    const rotate = fan.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] });
+    return (
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size} viewBox="0 0 48 48" style={{ overflow: 'visible' }}>{layers('airfry-ring')}</Svg>
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate }] }]}>
+          <Svg width={size} height={size} viewBox="0 0 48 48" style={{ overflow: 'visible' }}>{layers('airfry-fan')}</Svg>
+        </Animated.View>
+      </View>
+    );
+  }
   return (
-    <Svg width={size} height={size} viewBox="0 0 48 48" style={{ overflow: 'visible' }}>
-      {glow ? <G opacity={0.12}>{glyphBody(mode, glow, 12, 11)}</G> : null}
-      {glow ? <G opacity={0.2}>{glyphBody(mode, glow, 9, 8)}</G> : null}
-      {glow ? <G opacity={0.3}>{glyphBody(mode, glow, 6.5, 5.5)}</G> : null}
-      {body}
-    </Svg>
+    <Svg width={size} height={size} viewBox="0 0 48 48" style={{ overflow: 'visible' }}>{layers(mode)}</Svg>
   );
 }
 
-function glyphBody(mode: string, color: string, w: number, wThin: number) {
+/**
+ * The Air fry fan, as on the card (v0.4.9): it spins up while the tile is pressed
+ * (or hovered on the web) and, on letting go, eases to a stop on the next third of
+ * a turn, so it rests exactly as drawn (the three blades are identical). Still
+ * when the phone asks for reduced motion.
+ */
+class FanSpin {
+  readonly angle = new Animated.Value(0);
+  reduceMotion = false;
+  private a = 0; // degrees
+  private v = 0; // degrees per second
+  private on = false;
+  private t = 0;
+  private raf = 0;
+  private stop: { a0: number; D: number; T: number; s: number } | null = null;
+
+  spin(on: boolean) {
+    if (on && this.reduceMotion) return;
+    if (!on && !this.raf) return;
+    this.on = on;
+    this.stop = null;
+    if (!this.raf) { this.t = performance.now(); this.raf = requestAnimationFrame(this.step); }
+  }
+
+  cancel() { cancelAnimationFrame(this.raf); this.raf = 0; }
+
+  private step = (t: number) => {
+    const SPEED = 720, SPIN_UP = 0.35, COAST = 0.35; // deg/s at full speed; seconds to reach it; least coast
+    const dt = Math.min(0.05, Math.max(0, (t - this.t) / 1000));
+    this.t = t;
+    if (this.on) {
+      this.v = Math.min(SPEED, this.v + (SPEED / SPIN_UP) * dt);
+      this.a = (this.a + this.v * dt) % 360;
+    } else {
+      if (!this.stop) {
+        // Ease out from the current speed (cubic: starting speed 3D/T) onto the next third of a turn.
+        const target = Math.ceil((this.a + this.v * COAST) / 120 - 1e-6) * 120, D = target - this.a;
+        this.stop = { a0: this.a, D, T: D < 0.01 ? 0 : Math.min(2, Math.max(0.3, (3 * D) / Math.max(this.v, 1))), s: 0 };
+      }
+      const st = this.stop;
+      st.s += dt;
+      const k = st.T ? Math.min(1, st.s / st.T) : 1, r = 1 - k;
+      this.a = st.a0 + st.D * (1 - r * r * r);
+      this.v = st.T ? ((3 * st.D) / st.T) * r * r : 0;
+      if (k >= 1) {
+        this.a = this.v = this.raf = 0;
+        this.stop = null;
+        this.angle.setValue(0);
+        return;
+      }
+    }
+    this.angle.setValue(this.a);
+    this.raf = requestAnimationFrame(this.step);
+  };
+}
+
+function useFanSpin(enabled: boolean): FanSpin | null {
+  const [fan] = useState(() => new FanSpin());
+  useEffect(() => {
+    if (!enabled) return;
+    AccessibilityInfo.isReduceMotionEnabled().then((r) => { fan.reduceMotion = r; }).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (r) => { fan.reduceMotion = r; });
+    return () => { sub.remove(); fan.cancel(); };
+  }, [enabled, fan]);
+  return enabled ? fan : null;
+}
+
+function glyphBody(mode: string, color: string, w: number, wThin: number): ReactNode {
   const s = { stroke: color, strokeWidth: w, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   const thin = { ...s, strokeWidth: wThin };
-  return (() => {
+  return ((): ReactNode => {
     switch (mode) {
       case 'bake': return <Path d="M10 37h28" {...s} />;
       case 'broil': return <Path d="M10 11h28" {...s} />;
       case 'roast': return <Path d="M10 11h28M10 37h28" {...s} />;
       case 'toast': return <Path d="M10 11h7M20.5 11h7M31 11h7M10 37h7M20.5 37h7M31 37h7" {...s} />;
-      case 'airfry': return (<>
-        <Circle cx={24} cy={24} r={12.5} {...thin} />
+      case 'airfry': return (<>{glyphBody('airfry-ring', color, w, wThin)}{glyphBody('airfry-fan', color, w, wThin)}</>);
+      // Air fry in two layers, so the fan can turn inside its ring.
+      case 'airfry-ring': return <Circle cx={24} cy={24} r={12.5} {...thin} />;
+      case 'airfry-fan': return (<>
         {[0, 120, 240].map((a) => <Path key={a} transform={`rotate(${a} 24 24)`} d="M24 24c-1.5-5.5 1-9.5 5-9.2 2.6.3 2.8 4.4-5 9.2z" fill={color} />)}
       </>);
       case 'pizzaiolo': return (<>
@@ -162,6 +287,11 @@ function glyphBody(mode: string, color: string, w: number, wThin: number) {
         <Circle cx={24} cy={21} r={9} {...thin} />
         <Path d="M24 16v5l3.5 2" {...thin} />
       </>);
+      case 'camera': return (<>
+        <Path d="M9 16.5h6.5l3-4h11l3 4H39a2.5 2.5 0 0 1 2.5 2.5v15a2.5 2.5 0 0 1-2.5 2.5H9A2.5 2.5 0 0 1 6.5 34V19A2.5 2.5 0 0 1 9 16.5z" {...thin} />
+        <Circle cx={24} cy={26.5} r={6.5} {...thin} />
+      </>);
+      case 'settings':
       case 'more': return (<>
         <Circle cx={24} cy={24} r={9} {...thin} />
         <Circle cx={24} cy={24} r={3.5} {...thin} />
@@ -173,8 +303,12 @@ function glyphBody(mode: string, color: string, w: number, wThin: number) {
 }
 
 /** A square glowing tile with the mode's glyph, its label underneath. */
-export function ModeTile({ mode, label, size, onPress, util, selected, accessibilityLabel }: {
-  mode: string; label: string; size: number; onPress: () => void; util?: boolean; selected?: boolean; accessibilityLabel?: string;
+export function ModeTile({ mode, label, size, onPress, util, selected, accessibilityLabel, labelWidth, untested }: {
+  mode: string; label: string; size: number; onPress?: () => void; util?: boolean; selected?: boolean; accessibilityLabel?: string;
+  /** Room for the label; defaults to a little wider than the tile. */
+  labelWidth?: number;
+  /** A mode not yet started on a real oven (CookMode.untested): a small "?" in the corner. */
+  untested?: boolean;
 }) {
   const { c, f } = useTheme();
   const face = useSvgId('f');
@@ -184,29 +318,35 @@ export function ModeTile({ mode, label, size, onPress, util, selected, accessibi
   const [a, b, rim] = util ? [c.utilA, c.utilB, c.utilRim] : [c.tileA, c.tileB, selected ? c.ember : c.tileRim];
   const glyphColor = util ? c.utilGlyph : c.glyph;
   const glows = !util && c.glyphGlow !== 'transparent';
+  const fan = useFanSpin(mode === 'airfry' && !!onPress);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
       accessibilityLabel={accessibilityLabel ?? label}
-      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress(); }}
+      disabled={!onPress}
+      onPress={() => { Haptics.selectionAsync().catch(() => {}); onPress?.(); }}
+      onPressIn={() => fan?.spin(true)}
+      onPressOut={() => fan?.spin(false)}
+      onHoverIn={() => fan?.spin(true)}
+      onHoverOut={() => fan?.spin(false)}
       style={({ pressed }) => [{ alignItems: 'center', gap: 7, opacity: pressed ? 0.85 : 1 }]}
     >
       <View style={{ width: size, height: size }}>
         <Svg width={size} height={size}>
           <Defs>
             <LinearGradient id={face} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={a} />
-              <Stop offset="1" stopColor={b} />
+              <Stop offset="0" {...stopOf(a)} />
+              <Stop offset="1" {...stopOf(b)} />
             </LinearGradient>
             <RadialGradient id={glowId} cx="50%" cy="100%" rx="60%" ry="37.5%" fx="50%" fy="100%">
-              <Stop offset="0" stopColor={util ? 'transparent' : c.tileGlow} />
-              <Stop offset="1" stopColor={util ? 'transparent' : c.tileGlow} stopOpacity="0" />
+              <Stop offset="0" {...stopOf(util ? 'transparent' : c.tileGlow)} />
+              <Stop offset="1" {...stopOf(util ? 'transparent' : c.tileGlow, 0)} />
             </RadialGradient>
             <LinearGradient id={sheenId} x1="0" y1="0.2" x2="1" y2="0.8">
-              <Stop offset="0.56" stopColor={c.tileSheen} stopOpacity="0" />
-              <Stop offset="0.565" stopColor={c.tileSheen} stopOpacity="0.7" />
-              <Stop offset="0.78" stopColor={c.tileSheen} stopOpacity="0" />
+              <Stop offset="0.56" {...stopOf(c.tileSheen, 0)} />
+              <Stop offset="0.565" {...stopOf(c.tileSheen, 0.7)} />
+              <Stop offset="0.78" {...stopOf(c.tileSheen, 0)} />
             </LinearGradient>
           </Defs>
           <Rect width={size} height={size} rx={rx} fill={`url(#${face})`} />
@@ -215,20 +355,28 @@ export function ModeTile({ mode, label, size, onPress, util, selected, accessibi
           <Rect x={0.5} y={0.5} width={size - 1} height={size - 1} rx={rx} fill="none" stroke={rim} strokeWidth={selected ? 2.5 : 1} />
         </Svg>
         <View style={{ position: 'absolute', left: size * 0.16, top: size * 0.16 }}>
-          <ModeGlyph mode={mode} color={glyphColor} size={size * 0.68} glow={glows ? '#ff6a1a' : undefined} />
+          <ModeGlyph mode={mode} color={glyphColor} size={size * 0.68} glow={glows ? '#ff6a1a' : undefined} fan={fan?.angle} />
         </View>
+        {untested ? (
+          <View style={{
+            position: 'absolute', top: size * 0.07, right: size * 0.07, width: Math.max(16, size * 0.22), height: Math.max(16, size * 0.22),
+            borderRadius: 999, borderWidth: 1, borderColor: c.utilRim, backgroundColor: c.surfaceSunken, alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Text style={{ fontFamily: f.sansStrong, fontSize: Math.max(10, size * 0.14), lineHeight: Math.max(13, size * 0.18), color: c.inkMuted }}>?</Text>
+          </View>
+        ) : null}
       </View>
-      <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 20, color: selected ? c.ember : c.ink, maxWidth: size + 16 }}>{label}</Text>
+      {label ? <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 20, color: selected ? c.ember : c.ink, maxWidth: labelWidth ?? size + 16 }}>{label}</Text> : null}
     </Pressable>
   );
 }
 
-/** The LIVE / age pill on a camera picture. */
-export function CameraPill({ children }: { children: ReactNode }) {
+/** The LIVE / age pill on a camera picture; an old picture's age is amber. */
+export function CameraPill({ children, old }: { children: ReactNode; old?: boolean }) {
   const { f } = useTheme();
   return (
     <View style={{ position: 'absolute', left: 6, bottom: 6, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.66)' }}>
-      <Text style={{ color: '#fff', fontFamily: f.sansStrong, fontSize: 11, letterSpacing: 0.66 }}>{children}</Text>
+      <Text style={{ color: old ? '#fbbf24' : '#fff', fontFamily: f.sansStrong, fontSize: 11, letterSpacing: 0.66 }}>{children}</Text>
     </View>
   );
 }

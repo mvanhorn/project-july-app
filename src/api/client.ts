@@ -40,13 +40,15 @@ export type OvenSnapshot = {
   imageAt: number | null;
   offer: { type: 'keep_longer' | 'keep_shorter'; durationMs: number } | null;
   ended: 'completed' | 'cancelled' | null;
+  /** When `ended` was reported, in this app's clock. */
+  endedAt: number | null;
 };
 
 export const emptySnapshot = (): OvenSnapshot => ({
   link: 'connecting', ovenOnline: null, active: false, phase: 'idle', mode: null,
   cavityC: null, targetC: null, probeC: null, probeTargetC: null, planId: 0, progress: null,
   remainingMs: null, remainingAt: 0, elapsedMs: null, imageUrl: null, imageAt: null,
-  offer: null, ended: null,
+  offer: null, ended: null, endedAt: null,
 });
 
 export interface OvenLink {
@@ -63,9 +65,10 @@ export interface OvenLink {
   respondToOffer(accept: boolean): Promise<void>;
   /**
    * Live camera pictures while a screen is watching: calls `onFrame` with an
-   * image URI for each new picture. Returns a function that stops watching.
+   * image URI for each new picture. `stillMs` paces the stills fallback on a
+   * server without the stream. Returns a function that stops watching.
    */
-  watchCamera(onFrame: (uri: string) => void): () => void;
+  watchCamera(onFrame: (uri: string) => void, stillMs?: number): () => void;
   unpair(): Promise<void>;
 }
 
@@ -304,7 +307,7 @@ export class LiveOven implements OvenLink {
       }
       case MC.CookPlanEnded:
         this.preheatDone = false;
-        this.set({ active: false, ended: d.type === 'completed' ? 'completed' : 'cancelled', progress: null, remainingMs: null, probeTargetC: null, offer: null });
+        this.set({ active: false, ended: d.type === 'completed' ? 'completed' : 'cancelled', endedAt: Date.now(), progress: null, remainingMs: null, probeTargetC: null, offer: null });
         return;
       case MC.DeviceState:
         if (d.state === 'idle') this.preheatDone = false;
@@ -312,7 +315,7 @@ export class LiveOven implements OvenLink {
         return;
       case MC.Notification:
         if (d.notification_id === 'NOTIFICATION_PREHEAT_COMPLETE') { this.preheatDone = true; this.set({}); }
-        if (d.notification_id === 'NOTIFICATION_COOK_COMPLETE') this.set({ ended: 'completed' });
+        if (d.notification_id === 'NOTIFICATION_COOK_COMPLETE' && this.s.ended !== 'completed') this.set({ ended: 'completed', endedAt: Date.now() });
         return;
       case MC.VideoFrame:
         if (typeof d.image_url === 'string') this.set({ imageUrl: rehomeMediaUrl(this.p.conn, d.image_url), imageAt: Date.now() });
@@ -371,9 +374,10 @@ export class LiveOven implements OvenLink {
     // as the Home Assistant integration does. Only after a definite refusal (a
     // timeout may still have applied it), and only for a cook the phone can start
     // again: 11002 cooks run as plan 0, while touchscreen programs such as proof
-    // (plan 114) share a mode name but can't be restarted from here.
+    // (plan 114) share a mode name but can't be restarted from here. Toast is
+    // startable but never restarted (see CookMode.noRestart).
     const mode = this.s.mode;
-    if (status === null || !mode || this.s.planId !== 0 || !MODES.some((m) => m.id === mode)) throw ackError(status);
+    if (status === null || !mode || this.s.planId !== 0 || !MODES.some((m) => m.id === mode && !m.noRestart)) throw ackError(status);
     await this.cancel();
     await new Promise((r) => setTimeout(r, 400));
     await this.preheat(mode, tempC);
@@ -391,7 +395,7 @@ export class LiveOven implements OvenLink {
     this.set({ offer: null });
   }
 
-  watchCamera(onFrame: (uri: string) => void): () => void {
+  watchCamera(onFrame: (uri: string) => void, stillMs = 1000): () => void {
     const ctl = new AbortController();
     let stopPolling: (() => void) | null = null;
     const headers = { Authorization: `Bearer ${this.p.accessToken}`, 'User-Agent': USER_AGENT };
@@ -417,18 +421,18 @@ export class LiveOven implements OvenLink {
         if (!got && ++misses >= 2) break;
         await wait(2000);
       }
-      if (!ctl.signal.aborted) stopPolling = this.pollStills(onFrame);
+      if (!ctl.signal.aborted) stopPolling = this.pollStills(onFrame, stillMs);
     })();
 
     return () => { ctl.abort(); stopPolling?.(); };
   }
 
-  /** Fallback live view: keep the camera awake and fetch the latest still once a second (its cadence). */
-  private pollStills(onFrame: (uri: string) => void): () => void {
+  /** Fallback live view: keep the camera awake and fetch the latest still every `ms`. */
+  private pollStills(onFrame: (uri: string) => void, ms: number): () => void {
     const on = () => rest(this.p.conn, 'POST', '/internal/camera/on?seconds=120', { token: this.p.accessToken }).catch(() => {});
     on();
     const wake = setInterval(on, 100_000);
-    const pull = setInterval(() => onFrame(`${urls(this.p.conn).latestImage}?ts=${Date.now()}`), 1000);
+    const pull = setInterval(() => onFrame(`${urls(this.p.conn).latestImage}?ts=${Date.now()}`), Math.max(60, ms));
     return () => {
       clearInterval(wake);
       clearInterval(pull);

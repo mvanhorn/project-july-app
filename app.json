@@ -70,6 +70,15 @@
             "enableShrinkResourcesInReleaseBuilds": true
           }
         }
+      ],
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "photosPermission": false,
+          "savePhotosPermission": "Project July saves pictures from your oven camera to Photos when you ask.",
+          "granularPermissions": ["photo"]
+        }
       ]
     ],
     "experiments": {

@@ -1,6 +1,6 @@
 # Project July — mobile app
 
-The phone app for Project July ("June, local"). One Expo / React Native codebase builds the
+The phone app for Project July ("June, now local"). One Expo / React Native codebase builds the
 **iOS and Android** apps. The app talks to the oven's local `june-local`
 server over the home network, with no June cloud involved.
 
@@ -10,11 +10,20 @@ Light / Dark):
 - **Still Glass** (the default) matches the Home Assistant July Oven card
   ([prj-july/ha-june-oven, docs/july-oven-card](https://github.com/prj-july/ha-june-oven/tree/main/docs/july-oven-card)).
   It uses Barlow Semi Condensed / Barlow Condensed type and the oven's black glass in dark.
-  The oven tile follows the card's layout: name with a one-tap red Stop, a big number
-  with a status mark (↑ preheating, ✓ ready, flame cooking), the heat line, a 4:3 camera
-  and +1/+5/+10 min chips. When the oven is off it shows the home screen, with a clock and
-  glowing mode tiles. Starting goes through a review that warns the oven must be empty
-  and closes itself after 5 minutes.
+  The oven tile follows the card's layout (v0.4.1): the oven's icon as its lamp (orange
+  while heating) with its name and a one-tap red Stop, a big number with a status mark
+  (↑ preheating, ✓ ready, flame cooking), the heat line and +1/+5/+10 buttons. While
+  the oven is on, the camera is its own full-width tile below, with Full screen, Save
+  (to Photos) and Share in its corner. When the oven is off the app shows the oven's
+  home screen, drawn on the app itself rather than in a card: an oven-sized clock, the
+  last cook with **Repeat** (which opens its review with the same mode and
+  temperature), and glowing mode tiles four across with Camera last; Settings is in the
+  top bar. It sizes itself to the phone: the big clock if every row fits, a smaller
+  clock to make them fit, and only then does the screen scroll. With several ovens,
+  each is a page you swipe to (or pick with the dots under the top bar). Modes not yet
+  started on a real oven carry a "?". The name tucks into the icon after 5 s. Starting
+  goes through a review with a slider and a typed temperature, which warns the oven
+  must be empty and closes itself after 5 minutes.
 - **July** is the original July Oven design system: warm
   neutrals, one ember accent, Fraunces / Public Sans / IBM Plex Mono, and soft cards.
 
@@ -27,15 +36,18 @@ Colours, fonts, type scale and component choices for each theme live in
 | Screen | |
 |---|---|
 | **Welcome** | What Project July is, then *Set up this phone* or *Try the demo first*. |
-| **Set up** | Enter the oven's address (`june.local` by default). The app finds the server (HTTPS first, then the plain :80 listener, then :8080 for the reference server) and names this phone. |
+| **Set up** | Finds the oven on the home network (or takes a typed address), checks the server (HTTPS first, then the plain listener on port 80 or 8080), optionally takes the home `ca.crt`, and names this phone. |
 | **Pair** | Shows the eight-digit code to type on the oven's Connect screen, with a countdown, then runs the SRP key exchange. |
-| **Oven** | Live camera still, large temperature readout, status pill, preheat progress, timer countdown, and probe reading with its target. Controls for target temperature, timer and *Stop cooking*. |
-| **Start a cook** | Mode (Bake, Roast, Air fry, Broil, Pizza, Reheat, Keep warm, Dehydrate, Proof, Slow cook), temperature and an optional timer. |
-| **Live view** | The oven's MJPEG camera stream (about one picture a second, the stock camera's rate). The camera and interior light stay on while it is open. |
-| **Settings** | Theme and light/dark, oven details, connection, °F/°C, server status page, and unpairing. |
+| **Oven** | One page per paired oven; swipe (or tap the dots) to switch. Large temperature readout, status, preheat progress, timer countdown and probe reading, and while it's on, a full-width live camera tile with Full screen, Save and Share. Controls for target temperature, timer and *Stop cooking*. |
+| **Start a cook** | Mode, temperature and an optional timer. Bake is proven on a real oven; Roast, Air fry and Broil are names the Home Assistant integration sends. Toast, Pizza, Reheat, Keep warm, Dehydrate, Proof and Slow cook are marked untested: some (Proof, likely Toast) are programs on the oven, which may not start by name. |
+| **Live view** | The camera full screen, with Save (to Photos) and Share. Reads june-local's MJPEG stream; on a server without it, stills at the chosen frame rate (1, 5, 10 or 15 per second). Keeps the camera awake while open. |
+| **Settings** | Theme and light/dark, the paired ovens (show one, add another), the current oven's details, connection and *Forget this oven*, °F/°C, camera frame rate and server status page. With Still Glass, also the home screen choices from the Home Assistant card: the name tucking into the icon, cook modes in the oven's order or most used first, and a 12/24-hour clock. The oven's icon is always the June oven. |
 
 The demo mode is a simulated oven, always labelled *Demo*, so people can try
-the app (and designers can review it) without an oven.
+the app (and designers can review it) without an oven. In a web dev build
+(`npx expo start --web`), `?demo` opens it straight away, and
+`?demo=preheat|ready|cooking|probe|done|offline` starts it in that state, and
+`&ovens=2` (up to 5) adds idle demo ovens to swipe between.
 
 ## How it talks to the oven
 
@@ -74,29 +86,43 @@ against real ovens.
 Pairing keys are stored in the iOS Keychain / Android Keystore via
 `expo-secure-store` (`AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`).
 
-### Certificates and the plain-HTTP fallback
+### Finding the oven
 
-`june-local` serves the same routes on TLS :443 and plain :80 (the installer's
-boot image runs it with `--http-port 80`; the Python reference server uses
-:8080). The app tries HTTPS first. If the phone doesn't trust the home
-certificate yet, it uses plain :80 (or :8080), and says so on the setup and
-settings screens. Over plain HTTP, commands are still signed and pairing is still
-SRP-protected, but the link itself is not encrypted. Basic installs keep June's
-factory certificate, which no phone will accept for the oven's address, so they
-always use plain HTTP.
+The oven doesn't announce itself (no mDNS or broadcast), so Set up searches the
+phone's own home network: it asks each address on the /24 it is on for
+`/local/status` on the plain ports, a few seconds in all, and fills in the first
+june-local that answers. It only searches private addresses (10.x, 172.16–31.x,
+192.168.x) while on Wi-Fi or Ethernet, and never on the web, where expo-network
+reports the public address. People can always type the address instead.
 
-The installer names the oven `june.local` by default, advertises it over mDNS,
-and puts it in the certificate.
+### Certificates and the plain-port fallback
 
-To use HTTPS, generate per-install certs with june-local's `generate_certs.sh` (set
-`JUNE_IP_SAN` to the oven's IP so the address people type matches the
-certificate), then install `ca.crt` on the phone:
+`june-local` serves the same routes on TLS :443 and a plain listener: port 80 on
+the oven (its init script runs `--http-port 80`), 8080 on the reference server.
+The app tries HTTPS first, then both plain ports, and remembers which answered.
+If the phone doesn't trust the home certificate, it uses the plain port and says
+so on the setup and settings screens. There, commands are still signed and
+pairing is still SRP-protected, but the link itself is not encrypted.
 
-- **Android:** Settings → Security → Encryption & credentials → Install a
-  certificate → CA certificate. The app's network security config (added by
-  `plugins/withLocalNetwork.js`) trusts user CAs.
-- **iOS:** AirDrop or email `ca.crt`, install the profile, then turn it on under
-  Settings → General → About → Certificate Trust Settings.
+To use HTTPS with per-install certs from `generate_certs.sh`, either:
+
+- **Give the app the CA** (Set up or Settings → Home certificate): pick `ca.crt`
+  or paste it. The app then accepts the oven's certificate if its chain leads to
+  that CA, for that oven's address only. The hostname isn't checked, since the
+  certificate is often made for `oven.local` and reached by IP.
+- **Opt in to no checks** (same place, off by default): the link is encrypted
+  but the oven isn't verified. The screen says so.
+- **Install `ca.crt` on the phone** (as before). Android: Settings → Security →
+  Encryption & credentials → Install a certificate → CA certificate (the network
+  security config from `plugins/withLocalNetwork.js` trusts user CAs). iOS:
+  install the profile, then turn it on under Settings → General → About →
+  Certificate Trust Settings.
+
+The first two use the app's own native module, `modules/july-tls` (Kotlin and
+Swift), which adds a per-host rule to React Native's fetch and WebSocket. The
+phone's normal checks always run first; a rule only rescues a certificate they
+refuse. It needs a development or EAS build; in Expo Go and on the web, setup
+says so and the app falls back as before.
 
 ## Develop
 
@@ -110,7 +136,7 @@ npx expo start
 
 The **web** build runs the demo only, because browsers can't reach the oven's
 TLS or set WebSocket headers. For a real oven, use a development build on a
-phone. Expo Go may reach the plain :80 listener, but it doesn't include the app's network config plugin:
+phone. Expo Go may reach the plain port, but it doesn't include the app's network config plugin or its certificate module:
 
 ```bash
 npx eas-cli@latest build --profile development --platform android
@@ -128,6 +154,70 @@ If EAS can't resolve the project's git root (for example when building from a
 mapped network drive), set `EAS_NO_VCS=1`. EAS then uploads the folder as-is,
 filtered by `.easignore`. Building from a local copy of the folder also works.
 
+### Phone board (review every screen at once)
+
+`public/phones.html` shows the app's screens side by side in phone-sized frames:
+Welcome, Set up, Pair, the home screen in each oven state (preheating, ready,
+cooking, probe, done, offline), the start review, Settings and the camera. Pick
+the device size (your phone, small Android, iPhone, iPhone SE) and zoom at the
+top. Each frame is the real web dev build, so you can tap and scroll in it.
+
+```bash
+npx expo start --web
+```
+
+Then open **http://localhost:8081/phones.html**. To review from another computer
+on the same network, open `http://<this computer's IP>:8081/phones.html` instead
+(`ipconfig` shows the IP; Windows may ask once to let Node through its firewall).
+The frames load two at a time, the ones in view first, so the board fills in
+over a few seconds. If every frame stays blank, restart the dev server: piled-up
+bundle requests can keep it busy.
+
+The oven states come from `?demo=<state>` (web dev builds only), so any screen can
+be opened on its own too, for example `http://localhost:8081/?demo=cooking`.
+The home screen sizes itself to the phone, so switch the device size at the top
+to see it on each.
+
+### Build an APK on this machine
+
+No EAS and no build quota: one command builds an APK to send to any Android phone.
+
+```bash
+npm run build:apk
+```
+
+It builds the current commit (uncommitted changes are left out, with a warning)
+and copies the APK to `dist/project-july-<commit>.apk`. By default it builds for
+64-bit ARM (`arm64-v8a`), which covers phones from the last several years;
+`npm run build:apk -- --abi=all` adds older and emulator CPUs at about four
+times the build time. The first build takes a few minutes; later ones are
+faster.
+
+**One-time setup:**
+
+- **Java 17**, for example `winget install --id Microsoft.OpenJDK.17 --scope user`.
+  The script finds it in the usual install folders, or uses `JAVA_HOME`.
+- **The Android SDK**, in `%LOCALAPPDATA%\Android\Sdk` (or `ANDROID_HOME`):
+  platform 36, build-tools 36.0.0, NDK 27.1.12297006 and CMake 3.22.1. Download
+  the command-line tools from developer.android.com into
+  `Sdk\cmdline-tools\latest`, run `sdkmanager --licenses` to read and accept
+  Google's license, then install the packages. Pass them in a file
+  (`sdkmanager --package_file=packages.txt`, one per line), because Windows
+  splits a `ndk;27…` argument at the semicolon. Android Studio's setup does the
+  same if you'd rather use it.
+
+**Why it builds in `C:\pj-july`.** On Windows the native C++ build fails in a
+deep folder: object file paths pass CMake's 250-character limit and ninja stops
+with *build.ninja still dirty after 100 tries*. A `subst` drive or a junction
+doesn't help, because Node resolves them back to the real path. So when this
+checkout's path is long, the script keeps a second git worktree at `C:\pj-july`
+(`--dir=` to choose another), moves it to the current commit, and builds there.
+Remove it with `git worktree remove C:/pj-july`.
+
+**Installing.** The APK is signed with the standard local test key, not EAS's.
+Android won't install one over the other, so uninstall an EAS build of the app
+first; that clears its pairing.
+
 ### Release builds and updates
 
 Google Play builds are AABs signed with the EAS keystore. They can be built on
@@ -138,6 +228,8 @@ doesn't use the EAS build quota:
 npm run build:android:local
 ```
 
+Unlike `npm run build:apk`, it builds this checkout in place (uncommitted changes
+included) and signs with the EAS key, so the AAB can go to Play.
 It writes `dist/project-july-<versionCode>.aab`, taking the next version code
 after EAS's (`eas build:version:get`). Afterwards, run
 `eas build:version:set -p android` and enter that number so the next build doesn't
@@ -212,13 +304,16 @@ native binaries), prefix commands with
 ```
 src/app/          screens (Expo Router): index, cook, camera, settings, setup/index, setup/pair
 src/api/          protocol.ts (crypto + frames), pairing.ts, client.ts (live link),
-                  demo.ts, endpoint.ts, mjpeg.ts (camera stream), modes.ts, pairingCode.ts
-src/state/        OvenProvider (paired oven, live link, preferences), secure storage
+                  demo.ts, endpoint.ts, modes.ts, pairingCode.ts, discover.ts (network
+                  search), trust.ts (home certificate)
+src/state/        OvenProvider (paired oven, live link, preferences, certificate trust), secure storage
 src/components/   shared components, icons, OvenHero (July), GlassHero + glass.tsx (Still Glass)
 src/theme/        themes.ts (Still Glass and July: palettes, fonts, type, looks) and the ThemeProvider
-plugins/          Android network security config (user CAs, cleartext for the plain listener),
+modules/july-tls/ native module: per-host certificate trust for fetch and WebSocket
+plugins/          Android network security config (user CAs, cleartext for the plain port),
                   local release signing, Windows native build settings
-scripts/          protocol, client, camera and integration tests; build-android-release.js
+scripts/          protocol, client, camera, discovery and integration tests;
+                  build-apk.mjs (test APK), build-android-release.js (Play AAB)
 ```
 
 ## Known gaps
@@ -229,7 +324,9 @@ scripts/          protocol, client, camera and integration tests; build-android-
   app to owners.
 - Changing the temperature mid-cook tries `11005`. If the oven refuses, the app
   restarts the cook at the new temperature, as the Home Assistant integration does.
-- No recipes or guided programs yet, and one oven per phone. The installer can
+- A phone can pair with several ovens, and you swipe between them on the home
+  screen. Each one is still found and paired on its own, with its own code.
+- No recipes or guided programs yet. The installer can
   now put June's presets content on the oven (not in the public payload), which
   Proof and Slow Cook load on the oven. Starting those from the phone with
   `11002` is unverified: the Home Assistant integration offers only Bake, Roast,

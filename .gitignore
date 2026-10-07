@@ -47,3 +47,7 @@ CLAUDE.md
 # EAS signing credentials (downloaded for local release builds)
 credentials.json
 credentials/
+
+# Local native modules: build output
+/modules/*/android/build/
+/modules/*/android/.cxx/

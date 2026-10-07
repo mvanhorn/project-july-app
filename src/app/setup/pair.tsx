@@ -12,7 +12,8 @@ import { space, useTheme } from '@/theme';
 
 export default function Pair() {
   const { c, f, t, r, look } = useTheme();
-  const { completePairing } = useOven();
+  const { ovens, completePairing } = useOven();
+  const several = ovens.filter((o) => o.paired).length > 1;
   const params = useLocalSearchParams<{ host: string; secure: string; port?: string; name: string }>();
   const [ready, setReady] = useState(false);
   const [step, setStep] = useState<PairingStep>({ step: 'starting' });
@@ -21,7 +22,8 @@ export default function Pair() {
 
   function begin() {
     session.current?.close();
-    const s = new PairingSession({ host: params.host, secure: params.secure === '1', port: params.port ? Number(params.port) : undefined },params.name ?? 'Phone', (st) => {
+    const httpPort = params.port ? Number(params.port) : undefined;
+    const s = new PairingSession({ host: params.host, secure: params.secure === '1', httpPort }, params.name ?? 'Phone', (st) => {
       setStep(st);
       if (st.step === 'show-code') setTotal(st.expiresAt - Date.now());
       if (st.step === 'paired') {
@@ -42,7 +44,7 @@ export default function Pair() {
 
   if (!ready) {
     return (
-      <Screen footer={<Button variant="primary" onPress={begin}>The oven is ready — show the code</Button>}>
+      <Screen footer={<Button variant="primary" onPress={begin}>The oven is ready, show the code</Button>}>
         <View style={{ gap: space[2] }}>
           <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>Get the oven ready</Text>
           <T v="lead" muted>The code only lasts a minute or two, so open the oven’s Connect screen first.</T>
@@ -65,7 +67,7 @@ export default function Pair() {
           </View>
           <Text accessibilityRole="header" style={[t.title, { color: c.ink, textAlign: 'center' }]}>Setup complete</Text>
           <T v="lead" muted style={{ textAlign: 'center' }}>
-            {`This phone is paired with ${step.paired.oven.name}. Only paired phones can control it.`}
+            {`This phone is paired with ${step.paired.oven.name}. Only paired phones can control it.${several ? ' Swipe on the home screen to switch ovens.' : ''}`}
           </T>
         </View>
       </Screen>
@@ -91,7 +93,7 @@ export default function Pair() {
         <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>
           {exchanging ? 'Pairing…' : 'Enter this code on the oven'}
         </Text>
-        <T v="lead" muted>{exchanging ? 'The oven has the code. Exchanging keys — keep the oven on this screen.' : 'Type all eight digits on the oven’s Connect screen.'}</T>
+        <T v="lead" muted>{exchanging ? 'The oven has the code. Exchanging keys, so keep the oven on this screen.' : 'Type all eight digits on the oven’s Connect screen.'}</T>
       </View>
 
       <Card>

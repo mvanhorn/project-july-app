@@ -1,27 +1,55 @@
 // Cook modes the phone can start with 11002 Preheat (`primitive_type`).
 // Temperatures in °F; the wire takes milli-°C.
 
-export type CookMode = { id: string; label: string; hint: string; defaultF: number; minF: number; maxF: number };
+export type CookMode = {
+  id: string; label: string; hint: string; defaultF: number; minF: number; maxF: number;
+  /**
+   * Not yet started from a phone. Bake is proven on a real oven, and roast, broil
+   * and airfry are names the Home Assistant integration sends ("names match the June
+   * app"). The rest are guesses, or likely programs: proof runs as a touchscreen
+   * program (plan 114), which may not start by name, and toast may be one too.
+   * The oven may refuse these; the app then says so and nothing starts.
+   */
+  untested?: boolean;
+  /**
+   * Never cancel and restart at a new temperature when the oven refuses a change
+   * (setTemperature): toast is likely a timed program rather than held at a
+   * temperature, so a refused change leaves it running (scripts/client.test.ts).
+   */
+  noRestart?: boolean;
+};
 
 export const MODES: CookMode[] = [
   { id: 'bake', label: 'Bake', hint: 'Cakes, casseroles, most everyday cooking', defaultF: 350, minF: 170, maxF: 450 },
   { id: 'roast', label: 'Roast', hint: 'Vegetables and meats, browned outside', defaultF: 400, minF: 250, maxF: 450 },
   { id: 'airfry', label: 'Air fry', hint: 'Crisp without the oil', defaultF: 400, minF: 300, maxF: 450 },
   { id: 'broil', label: 'Broil', hint: 'Top heat to melt and brown', defaultF: 450, minF: 400, maxF: 450 },
-  { id: 'pizzaiolo', label: 'Pizza', hint: 'Hottest oven for a crisp base', defaultF: 450, minF: 400, maxF: 450 },
-  { id: 'reheat', label: 'Reheat', hint: 'Warm up leftovers gently', defaultF: 300, minF: 250, maxF: 400 },
-  { id: 'warm', label: 'Keep warm', hint: 'Hold cooked food until serving', defaultF: 170, minF: 150, maxF: 200 },
-  { id: 'dehydrate', label: 'Dehydrate', hint: 'Dry fruit, herbs and jerky', defaultF: 150, minF: 100, maxF: 200 },
-  { id: 'proof', label: 'Proof', hint: 'Help dough rise', defaultF: 90, minF: 80, maxF: 110 },
-  { id: 'slow_cook', label: 'Slow cook', hint: 'Low and slow for hours', defaultF: 225, minF: 180, maxF: 275 },
+  // The integration sends "toast" by name, but on the oven Toast is likely a
+  // program (like proof), so it may not start that way.
+  { id: 'toast', label: 'Toast', hint: 'Bread, bagels and English muffins', defaultF: 450, minF: 300, maxF: 500, noRestart: true, untested: true },
+  { id: 'pizzaiolo', label: 'Pizza', hint: 'Hottest oven for a crisp base', defaultF: 450, minF: 400, maxF: 450, untested: true },
+  { id: 'reheat', label: 'Reheat', hint: 'Warm up leftovers gently', defaultF: 300, minF: 250, maxF: 400, untested: true },
+  { id: 'warm', label: 'Keep warm', hint: 'Hold cooked food until serving', defaultF: 170, minF: 150, maxF: 200, untested: true },
+  { id: 'dehydrate', label: 'Dehydrate', hint: 'Dry fruit, herbs and jerky', defaultF: 150, minF: 100, maxF: 200, untested: true },
+  { id: 'proof', label: 'Proof', hint: 'Help dough rise', defaultF: 90, minF: 80, maxF: 110, untested: true },
+  { id: 'slow_cook', label: 'Slow cook', hint: 'Low and slow for hours', defaultF: 225, minF: 180, maxF: 275, untested: true },
 ];
 
 /**
- * Idle tiles on the glass home screen. The Home Assistant card offers bake, roast,
- * broil, air fry and toast; toast is not in MODES here (a refused temperature change
- * must never restart it, see scripts/client.test.ts), so pizza takes its place.
+ * Mode tiles on the glass home screen, in the oven's order: the Home Assistant card's
+ * five (bake, roast, broil, air fry, toast) first, then the other untested ones.
+ * Camera follows; the card sizes the grid to the phone (GlassHero).
  */
-export const QUICK_MODES = ['bake', 'roast', 'broil', 'airfry', 'pizzaiolo'];
+export const TILE_MODES = ['bake', 'roast', 'broil', 'airfry', 'toast', 'pizzaiolo', 'reheat', 'warm', 'dehydrate', 'proof', 'slow_cook']
+  .map((id) => MODES.find((m) => m.id === id)!);
+
+/** The tiles' modes, most used first if asked (ties keep the oven's order), as on the card. */
+export function tileModes(order: 'oven' | 'used', uses: Record<string, number>): CookMode[] {
+  if (order !== 'used') return TILE_MODES;
+  return TILE_MODES.map((m, i) => [m, i] as const)
+    .sort((a, b) => (uses[b[0].id] ?? 0) - (uses[a[0].id] ?? 0) || a[1] - b[1])
+    .map(([m]) => m);
+}
 
 export function modeLabel(id: string | null | undefined): string {
   if (!id) return 'Cooking';

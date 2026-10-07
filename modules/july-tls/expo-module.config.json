@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["JulyTlsModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.julytls.JulyTlsModule"]
+  }
+}

@@ -1,14 +1,15 @@
-import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { router, useIsFocused } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { OvenError } from '@/api/client';
+import { OvenError, type OvenLink, type OvenSnapshot } from '@/api/client';
 import { MODES, fToC, show, formatDuration } from '@/api/modes';
-import { GlassHero } from '@/components/GlassHero';
+import { CameraTile } from '@/components/CameraTile';
+import { DONE_WINDOW_MS, GlassHero } from '@/components/GlassHero';
 import { Icon, JulyMark, type IconName } from '@/components/Icon';
 import { OvenHero, remainingNow, useNow } from '@/components/OvenHero';
 import { Button, Card, Chip, IconButton, Notice, RoundButton, Screen, SectionLabel, T, confirm } from '@/components/ui';
-import { useOven, useOvenName } from '@/state/oven';
+import { useOven, useSnapshot, type OvenEntry } from '@/state/oven';
 import { space, useTheme } from '@/theme';
 
 export default function Home() {
@@ -45,9 +46,9 @@ function Welcome() {
           <View style={[styles.markDisc, { backgroundColor: c.emberSoft }]}>
             <JulyMark size={52} color={c.ember} />
           </View>
-          <View accessible accessibilityLabel="Project July. June, local.">
+          <View accessible accessibilityLabel="Project July. June, now local.">
             <Text style={{ fontFamily: f.display, fontSize: 24, lineHeight: 30, color: c.ink }}>Project July</Text>
-            <Text style={[t.label, { color: c.ember }]}>June, local</Text>
+            <Text style={[t.label, { color: c.ember }]}>June, now local</Text>
           </View>
         </View>
         <Text accessibilityRole="header" style={[t.hero, { color: c.ink, fontSize: 48, lineHeight: 54 }]}>
@@ -74,12 +75,102 @@ function Welcome() {
 }
 
 // --- Dashboard ---------------------------------------------------------------
+// One page per paired oven; swipe sideways (or tap a dot) to switch. The page in
+// view is the current oven, which Settings, Start a cook and Live view act on.
 
 function Dashboard() {
   const { c, f, t, look } = useTheme();
-  const { link, snap: s, prefs, paired } = useOven();
-  const name = useOvenName();
+  const { ovens, currentId, select, link } = useOven();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const focused = useIsFocused();
+  const pager = useRef<ScrollView>(null);
+  const offset = useRef(0);
+  const index = Math.max(0, ovens.findIndex((o) => o.id === currentId));
+  const many = ovens.length > 1;
+
+  // Follow the current oven when it changes elsewhere (Settings, a new pairing), but
+  // not while a swipe is what changed it.
+  useEffect(() => {
+    if (Math.round(offset.current / width) !== index) pager.current?.scrollTo({ x: index * width, animated: false });
+  }, [index, width]);
+
+  const goTo = (i: number) => {
+    pager.current?.scrollTo({ x: i * width, animated: true });
+    if (ovens[i]) select(ovens[i].id);
+  };
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.surface }}>
+      <View style={[styles.topBar, { paddingTop: insets.top + space[2] }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+          <JulyMark size={28} color={c.ember} />
+          <Text style={{ fontFamily: f.display, fontSize: 20, color: c.ink }}>Project July</Text>
+          {link?.demo ? (
+            <View style={[styles.demoTag, { backgroundColor: c.heatSoft }]}>
+              <Text style={[t.label, { color: c.heat }]}>Demo</Text>
+            </View>
+          ) : null}
+        </View>
+        <IconButton icon="gear" label="Settings" onPress={() => router.push('/settings')} />
+      </View>
+
+      {many ? (
+        // Swiping is never the only way: each dot is a 48 px button. The July page
+        // already has the oven's name as its title, so there the dots stand alone.
+        <View style={[styles.switcher, look.hero !== 'glass' && { justifyContent: 'center' }]}>
+          {look.hero === 'glass' ? (
+            <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: f.sansStrong, fontSize: 16, color: c.ink }}>{ovens[index]?.name}</Text>
+          ) : null}
+          <View style={{ flexDirection: 'row' }}>
+            {ovens.map((o, i) => (
+              <Pressable
+                key={o.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Show ${o.name}, oven ${i + 1} of ${ovens.length}`}
+                accessibilityState={{ selected: i === index }}
+                onPress={() => goTo(i)}
+                style={styles.dot}
+              >
+                <View style={{ width: i === index ? 18 : 8, height: 8, borderRadius: 4, backgroundColor: i === index ? c.ember : c.ink, opacity: i === index ? 1 : 0.28 }} />
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      <ScrollView
+        ref={pager}
+        horizontal
+        pagingEnabled
+        scrollEnabled={many}
+        showsHorizontalScrollIndicator={false}
+        contentOffset={{ x: index * width, y: 0 }}
+        scrollEventThrottle={32}
+        onScroll={(e) => {
+          offset.current = e.nativeEvent.contentOffset.x;
+          const o = ovens[Math.round(offset.current / width)];
+          if (o && o.id !== currentId) select(o.id);
+        }}
+        style={{ flex: 1 }}
+      >
+        {ovens.map((o, i) => (
+          <View key={o.id} style={{ width }} accessibilityLabel={many ? `${o.name}, oven ${i + 1} of ${ovens.length}` : undefined}>
+            <OvenPage entry={o} visible={focused && i === index} />
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function OvenPage({ entry, visible }: { entry: OvenEntry; visible: boolean }) {
+  const { c, t, look } = useTheme();
+  const { prefs, lastCooks, select } = useOven();
+  const insets = useSafeAreaInsets();
+  const link = entry.link;
+  const s = useSnapshot(link);
+  const name = entry.name;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [dismissedDone, setDismissedDone] = useState(false);
@@ -93,6 +184,8 @@ function Dashboard() {
     setWasActive(s.active);
     if (s.active) setDismissedDone(false);
   }
+  // Glass: Done shows from when the cook completed, for 30 minutes or until dismissed.
+  const done = s.phase === 'done' && !dismissedDone ? { at: s.endedAt } : null;
 
   async function run(key: string, fn: () => Promise<void>) {
     setBusy(key);
@@ -108,110 +201,115 @@ function Dashboard() {
     }
   }
 
+  // Screens opened from here act on the current oven: make sure it is this one.
+  const open = (href: Parameters<typeof router.push>[0]) => { select(entry.id); router.push(href); };
+
   const offline = s.link === 'offline' || s.ovenOnline === false;
-  const now = useNow(s.remainingMs !== null);
+  const now = useNow(s.remainingMs !== null || done !== null);
   const left = remainingNow(s, now);
-  const connection = link?.demo ? 'Simulated — nothing is sent to an oven'
+  const showDone = done !== null && (done.at === null || now - done.at < DONE_WINDOW_MS);
+  const connection = link.demo ? 'Simulated. Nothing is sent to an oven.'
     : s.link === 'connecting' ? 'Connecting on your home network…'
     : offline ? 'Not connected'
-    : `Connected at home · ${paired?.conn.host}`;
+    : `Connected at home · ${entry.paired?.conn.host}`;
 
   return (
-    <Screen>
-      <View style={[styles.topBar, { paddingTop: insets.top + space[2] }]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
-          <JulyMark size={28} color={c.ember} />
-          <Text style={{ fontFamily: f.display, fontSize: 20, color: c.ink }}>Project July</Text>
-          {link?.demo ? (
-            <View style={[styles.demoTag, { backgroundColor: c.heatSoft }]}>
-              <Text style={[t.label, { color: c.heat }]}>Demo</Text>
-            </View>
-          ) : null}
-        </View>
-        <IconButton icon="gear" label="Settings" onPress={() => router.push('/settings')} />
-      </View>
-
-      {glass ? (
-        // The card carries the oven's name; only the connection line sits above it.
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2], marginTop: -space[3] }}>
-          <Icon name={offline ? 'alert' : 'house'} size={18} color={offline ? c.fault : c.inkMuted} />
-          <T v="small" muted>{connection}</T>
-        </View>
-      ) : (
-        <View style={{ gap: space[1], marginTop: -space[2] }}>
-          <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>{name}</Text>
+    <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + space[8] }}>
+      <View style={styles.page}>
+        {glass ? (
+          // The oven's own screen carries its name; only the connection line sits above it.
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
             <Icon name={offline ? 'alert' : 'house'} size={18} color={offline ? c.fault : c.inkMuted} />
-            <T v="small" muted>{connection}</T>
+            <T v="small" muted style={{ flexShrink: 1 }}>{connection}</T>
           </View>
-        </View>
-      )}
+        ) : (
+          <View style={{ gap: space[1] }}>
+            <Text accessibilityRole="header" style={[t.title, { color: c.ink }]}>{name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space[2] }}>
+              <Icon name={offline ? 'alert' : 'house'} size={18} color={offline ? c.fault : c.inkMuted} />
+              <T v="small" muted style={{ flexShrink: 1 }}>{connection}</T>
+            </View>
+          </View>
+        )}
 
-      {offline && !link?.demo ? (
-        <Notice tone="warning" title="Can't reach the oven">
-          Check that this phone is on your home Wi-Fi and the oven is switched on. The app keeps trying on its own.
-        </Notice>
-      ) : null}
+        {offline && !link.demo ? (
+          <Notice tone="warning" title="Can't reach the oven">
+            Check that this phone is on your home Wi-Fi and the oven is switched on. The app keeps trying on its own.
+          </Notice>
+        ) : null}
 
-      {glass ? (
-        <GlassHero
-          s={s}
-          unit={unit}
-          demo={!!link?.demo}
-          name={name}
-          onCamera={() => router.push('/camera')}
-          // Stop is one tap and never confirmed (DESIGN.md, "The rules every state follows").
-          onStop={() => run('cancel', () => link!.cancel())}
-          stopping={busy === 'cancel'}
-          onAddMinutes={(min) => run('timer', () => link!.setTimer((left ?? 0) + min * 60_000))}
-          onMode={(mode) => router.push({ pathname: '/cook', params: { mode } })}
-          onMore={() => router.push('/cook')}
-          showDone={!dismissedDone}
-          onDismissDone={() => setDismissedDone(true)}
-        />
-      ) : (
-        <OvenHero s={s} unit={unit} demo={!!link?.demo} onCamera={() => router.push('/camera')} />
-      )}
+        {glass ? (
+          <GlassHero
+            s={s}
+            unit={unit}
+            demo={!!link.demo}
+            name={name}
+            // Stop is one tap and never confirmed (DESIGN.md, "The rules every state follows").
+            onStop={() => run('cancel', () => link.cancel())}
+            stopping={busy === 'cancel'}
+            onAddMinutes={(min) => run('timer', () => link.setTimer((left ?? 0) + min * 60_000))}
+            onMode={(mode) => open({ pathname: '/cook', params: { mode } })}
+            onRepeat={(mode, tempF) => open({ pathname: '/cook', params: { mode, temp: String(tempF) } })}
+            onCamera={() => open('/camera')}
+            lastCook={lastCooks[entry.id] ?? null}
+            done={done}
+            onDismissDone={() => setDismissedDone(true)}
+          />
+        ) : (
+          <OvenHero s={s} unit={unit} demo={!!link.demo} onCamera={() => open('/camera')} />
+        )}
 
-      {error ? <Notice tone="warning" title="That didn't work">{error}</Notice> : null}
+        {glass && !offline && (s.active || showDone) ? (
+          <CameraTile name={name} demo={!!link.demo} on={visible} onFullscreen={() => open('/camera')} />
+        ) : null}
 
-      {s.offer ? (
-        <Notice tone="info" title={s.offer.type === 'keep_longer' ? 'The oven suggests a little longer' : 'The oven thinks it may be done early'}>
-          {`About ${Math.round(s.offer.durationMs / 60000)} min ${s.offer.type === 'keep_longer' ? 'more' : 'less'}.`}
-        </Notice>
-      ) : null}
-      {s.offer ? (
-        <View style={{ flexDirection: 'row', gap: space[3] }}>
-          <Button style={{ flex: 1 }} onPress={() => run('offer', () => link!.respondToOffer(true))}>Accept</Button>
-          <Button style={{ flex: 1 }} variant="quiet" onPress={() => run('offer', () => link!.respondToOffer(false))}>No thanks</Button>
-        </View>
-      ) : null}
+        {error ? <Notice tone="warning" title="That didn't work">{error}</Notice> : null}
 
-      {!glass && s.phase === 'done' && !dismissedDone ? (
-        <Notice tone="success" title="Cooking finished">The oven has switched off its heat and is cooling down.</Notice>
-      ) : null}
+        {s.offer ? (
+          <Notice tone="info" title={s.offer.type === 'keep_longer' ? 'The oven suggests a little longer' : 'The oven thinks it may be done early'}>
+            {`About ${Math.round(s.offer.durationMs / 60000)} min ${s.offer.type === 'keep_longer' ? 'more' : 'less'}.`}
+          </Notice>
+        ) : null}
+        {s.offer ? (
+          <View style={{ flexDirection: 'row', gap: space[3] }}>
+            <Button style={{ flex: 1 }} onPress={() => run('offer', () => link.respondToOffer(true))}>Accept</Button>
+            <Button style={{ flex: 1 }} variant="quiet" onPress={() => run('offer', () => link.respondToOffer(false))}>No thanks</Button>
+          </View>
+        ) : null}
 
-      {s.active ? (
-        <ActiveControls s={s} unit={unit} busy={busy} run={run} />
-      ) : glass ? null : (
-        <IdleControls disabled={offline && !link?.demo} onDismissDone={() => setDismissedDone(true)} showDismiss={s.phase === 'done' && !dismissedDone} />
-      )}
-    </Screen>
+        {!glass && s.phase === 'done' && !dismissedDone ? (
+          <Notice tone="success" title="Cooking finished">The oven has switched off its heat and is cooling down.</Notice>
+        ) : null}
+
+        {s.active ? (
+          <ActiveControls s={s} link={link} unit={unit} busy={busy} run={run} />
+        ) : glass ? null : (
+          <IdleControls
+            disabled={offline && !link.demo}
+            open={open}
+            onDismissDone={() => setDismissedDone(true)}
+            showDismiss={s.phase === 'done' && !dismissedDone}
+          />
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
-function IdleControls({ disabled, onDismissDone, showDismiss }: { disabled: boolean; onDismissDone: () => void; showDismiss: boolean }) {
+function IdleControls({ disabled, open, onDismissDone, showDismiss }: {
+  disabled: boolean; open: (href: Parameters<typeof router.push>[0]) => void; onDismissDone: () => void; showDismiss: boolean;
+}) {
   const { prefs } = useOven();
   const quick = MODES.slice(0, 3);
   return (
     <View style={{ gap: space[4] }}>
-      <Button variant="primary" icon="flame" disabled={disabled} onPress={() => { onDismissDone(); router.push('/cook'); }}>
+      <Button variant="primary" icon="flame" disabled={disabled} onPress={() => { onDismissDone(); open('/cook'); }}>
         Start cooking
       </Button>
       <SectionLabel>Quick start</SectionLabel>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space[2] }}>
         {quick.map((m) => (
-          <Chip key={m.id} onPress={() => router.push({ pathname: '/cook', params: { mode: m.id } })}>
+          <Chip key={m.id} onPress={() => open({ pathname: '/cook', params: { mode: m.id } })}>
             {`${m.label} ${prefs.unit === 'F' ? m.defaultF : Math.round(fToC(m.defaultF) / 5) * 5}°`}
           </Chip>
         ))}
@@ -221,12 +319,11 @@ function IdleControls({ disabled, onDismissDone, showDismiss }: { disabled: bool
   );
 }
 
-function ActiveControls({ s, unit, busy, run }: {
-  s: ReturnType<typeof useOven>['snap']; unit: 'F' | 'C'; busy: string | null;
+function ActiveControls({ s, link, unit, busy, run }: {
+  s: OvenSnapshot; link: OvenLink; unit: 'F' | 'C'; busy: string | null;
   run: (key: string, fn: () => Promise<void>) => Promise<void>;
 }) {
   const { c, f, look } = useTheme();
-  const { link } = useOven();
   const step = unit === 'F' ? 5 : 5 * (5 / 9);
   const [pendingC, setPendingC] = useState<number | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -243,11 +340,11 @@ function ActiveControls({ s, unit, busy, run }: {
     setPendingC(next);
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => {
-      run('temp', () => link!.setTemperature(next)).finally(() => setPendingC(null));
+      run('temp', () => link.setTemperature(next)).finally(() => setPendingC(null));
     }, 900);
   }
 
-  const addTimer = (min: number) => run('timer', () => link!.setTimer((left ?? 0) + min * 60_000));
+  const addTimer = (min: number) => run('timer', () => link.setTimer((left ?? 0) + min * 60_000));
 
   return (
     <View style={{ gap: space[4] }}>
@@ -291,7 +388,7 @@ function ActiveControls({ s, unit, busy, run }: {
           icon="stop"
           busy={busy === 'cancel'}
           onPress={async () => {
-            if (!look.confirmStop || await confirm('Stop cooking?', 'The oven will turn off its heat.', 'Stop cooking')) run('cancel', () => link!.cancel());
+            if (!look.confirmStop || await confirm('Stop cooking?', 'The oven will turn off its heat.', 'Stop cooking')) run('cancel', () => link.cancel());
           }}
         >
           Stop cooking
@@ -304,7 +401,10 @@ function ActiveControls({ s, unit, busy, run }: {
 const styles = StyleSheet.create({
   markDisc: { width: 88, height: 88, borderRadius: 44, alignItems: 'center', justifyContent: 'center' },
   pointIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingLeft: space[5], paddingRight: space[3], paddingBottom: space[2] },
+  switcher: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[3], paddingLeft: space[5], paddingRight: space[3], marginTop: -space[2] },
+  dot: { width: 32, height: 48, alignItems: 'center', justifyContent: 'center' },
+  page: { width: '100%', maxWidth: 560, alignSelf: 'center', paddingHorizontal: space[5], paddingTop: space[2], gap: space[6] },
   demoTag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginLeft: space[1] },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: space[4] },
 });

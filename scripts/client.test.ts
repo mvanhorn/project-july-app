@@ -134,6 +134,13 @@ async function main() {
     emit(MC.CookPlanStarted, plan('toast', 0, 200_000));
     await rejects(link.setTemperature(210), 'not-allowed');
     assert.deepEqual(sent.map((s) => s.code), [MC.SetCavityTemp]);
+    console.log('✓ refused 11005 on toast (startable, never restarted) leaves it running');
+  }
+  {
+    const { link, emit, sent } = rig(oven('not-allowed'));
+    emit(MC.CookPlanStarted, plan('sous_vide', 0, 60_000));
+    await rejects(link.setTemperature(65), 'not-allowed');
+    assert.deepEqual(sent.map((s) => s.code), [MC.SetCavityTemp]);
     console.log('✓ refused 11005 on a mode the phone cannot start leaves it running');
   }
   console.log('all client checks passed');
