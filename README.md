@@ -128,6 +128,43 @@ If EAS can't resolve the project's git root (for example when building from a
 mapped network drive), set `EAS_NO_VCS=1`. EAS then uploads the folder as-is,
 filtered by `.easignore`. Building from a local copy of the folder also works.
 
+### Release builds and updates
+
+Google Play builds are AABs signed with the EAS keystore. They can be built on
+EAS (`eas build -p android --profile production`) or on your own machine, which
+doesn't use the EAS build quota:
+
+```bash
+npm run build:android:local
+```
+
+It writes `dist/project-july-<versionCode>.aab`, taking the next version code
+after EAS's (`eas build:version:get`). Afterwards, run
+`eas build:version:set -p android` and enter that number so the next build doesn't
+reuse it. A local build needs:
+
+- `credentials.json` from `eas credentials -p android` (credentials.json →
+  Download). It's gitignored and easignored; `plugins/withLocalReleaseSigning.js`
+  reads it at build time.
+- JDK 17+ and the Android SDK, plus, on Windows, CMake 3.31.6
+  (`sdkmanager "cmake/3.31.6"`) and long paths turned on
+  (`LongPathsEnabled` = 1 under `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem`).
+  `plugins/withWindowsNativeBuild.js` points the native builds at that CMake.
+
+JavaScript-only changes ship without a new build, through EAS Update:
+
+```bash
+npx eas-cli@latest update --channel production --message "Describe the change" --environment production
+```
+
+An update reaches only builds with the same runtime version, which is a
+fingerprint of the native project (`runtimeVersion.policy: fingerprint`). Changing
+`app.json`, `plugins/`, native dependencies or package.json scripts changes it,
+so those changes need a new build. `fingerprint.config.js` leaves `eas.json` and
+`.easignore` out.
+
+`store-assets/` holds the Play Store icon, feature graphic and screenshots.
+
 ### Checks
 
 ```bash
@@ -179,8 +216,9 @@ src/api/          protocol.ts (crypto + frames), pairing.ts, client.ts (live lin
 src/state/        OvenProvider (paired oven, live link, preferences), secure storage
 src/components/   shared components, icons, OvenHero (July), GlassHero + glass.tsx (Still Glass)
 src/theme/        themes.ts (Still Glass and July: palettes, fonts, type, looks) and the ThemeProvider
-plugins/          Android network security config (user CAs, cleartext for the plain listener)
-scripts/          protocol, client, camera and integration tests
+plugins/          Android network security config (user CAs, cleartext for the plain listener),
+                  local release signing, Windows native build settings
+scripts/          protocol, client, camera and integration tests; build-android-release.js
 ```
 
 ## Known gaps

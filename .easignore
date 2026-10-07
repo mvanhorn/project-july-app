@@ -44,3 +44,7 @@ yarn-error.*
 # Local-only
 .claude/
 .git/
+
+# EAS signing credentials (downloaded for local release builds)
+credentials.json
+credentials/

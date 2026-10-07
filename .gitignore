@@ -43,3 +43,7 @@ yarn-error.*
 # Local agent tooling (not part of the project)
 CLAUDE.md
 .claude/
+
+# EAS signing credentials (downloaded for local release builds)
+credentials.json
+credentials/
