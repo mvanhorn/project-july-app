@@ -4,6 +4,15 @@ The phone app for Project July ("June, now local"). One Expo / React Native code
 **iOS and Android** apps. The app talks to the oven's local `june-local`
 server over the home network, with no June cloud involved.
 
+<p align="center">
+  <img src="docs/screenshots/welcome.png" width="160" alt="Welcome screen: Your oven keeps working, with Set up this phone and Try the demo first">
+  <img src="docs/screenshots/home.png" width="160" alt="Home screen with the oven off: a big clock, the last cook with Repeat, and twelve glowing mode tiles">
+  <img src="docs/screenshots/start.png" width="160" alt="Start review for Roast at 400 °F with a temperature slider, timer choices and Start preheating">
+  <img src="docs/screenshots/cooking.png" width="160" alt="Cooking: 12:25 left with a red Stop, +1/+5/+10 buttons and the camera tile">
+  <img src="docs/screenshots/july-light.png" width="160" alt="The July theme in light mode: the camera above a large 401 °F reading and the 400° target">
+</p>
+<p align="center"><sub>Demo mode, in the Still Glass theme and (right) July in light. <code>store-assets/</code> has the Play Store versions.</sub></p>
+
 It has two themes, each in light and dark (Settings → Appearance, with Match phone /
 Light / Dark):
 
@@ -255,7 +264,9 @@ fingerprint of the native project (`runtimeVersion.policy: fingerprint`). Changi
 so those changes need a new build. `fingerprint.config.js` leaves `eas.json` and
 `.easignore` out.
 
-`store-assets/` holds the Play Store icon, feature graphic and screenshots.
+`store-assets/` holds the Play Store icon, feature graphic and screenshots, and
+`docs/screenshots/` the smaller ones above. Both come from the web demo
+(`?demo=<scene>`) at 1080×1920.
 
 ### Checks
 
@@ -310,6 +321,7 @@ src/state/        OvenProvider (paired oven, live link, preferences, certificate
 src/components/   shared components, icons, OvenHero (July), GlassHero + glass.tsx (Still Glass)
 src/theme/        themes.ts (Still Glass and July: palettes, fonts, type, looks) and the ThemeProvider
 modules/july-tls/ native module: per-host certificate trust for fetch and WebSocket
+docs/screenshots/ README screenshots (store-assets/ has the Play Store graphics)
 plugins/          Android network security config (user CAs, cleartext for the plain port),
                   local release signing, Windows native build settings
 scripts/          protocol, client, camera, discovery and integration tests;
