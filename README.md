@@ -1,5 +1,24 @@
 # Project July — mobile app
 
+## Get the app (Android)
+
+Project July is in **beta on Google Play**. While it's a closed beta, these three
+steps have to be done in order, signed in with the same Google account that's on
+your phone:
+
+1. **Join the beta group:** <https://groups.google.com/g/prj-july-beta>
+2. **Become a tester:** <https://play.google.com/apps/testing/org.projectjuly.oven>
+3. **Install from Google Play:** <https://play.google.com/store/apps/details?id=org.projectjuly.oven>
+
+The Play Store page says *Not found* until steps 1 and 2 are done, and it can take
+a few minutes to appear after that. No oven yet? Tap **Try the demo first** in the app.
+You'll also need [june-local](https://github.com/prj-july) running on your home
+network to control a real oven. Feedback: hello@project-july.org
+
+An iPhone version isn't available yet.
+
+---
+
 The phone app for Project July ("June, now local"). One Expo / React Native codebase builds the
 **iOS and Android** apps. The app talks to the oven's local `june-local`
 server over the home network, with no June cloud involved.
