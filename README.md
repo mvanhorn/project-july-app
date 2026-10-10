@@ -19,9 +19,13 @@ An iPhone version isn't available yet.
 
 ---
 
-The phone app for Project July ("June, now local"). One Expo / React Native codebase builds the
-**iOS and Android** apps. The app talks to the oven's local `june-local`
-server over the home network, with no June cloud involved.
+The phone app for Project July ("June, now local"). The app talks to the oven's
+local `june-local` server over the home network, with no June cloud involved.
+
+The **Android** app is tested on real ovens: pairing, starting and stopping cooks,
+temperature and timer changes, the probe, the live camera and several ovens on
+one phone. One Expo / React Native codebase also builds for **iOS**, but that
+version hasn't been tested on an iPhone yet.
 
 <p align="center">
   <img src="docs/screenshots/welcome.png" width="160" alt="Welcome screen: Your oven keeps working, with Set up this phone and Try the demo first">
@@ -38,7 +42,7 @@ Light / Dark):
 - **Still Glass** (the default) matches the Home Assistant July Oven card
   ([prj-july/ha-june-oven, docs/july-oven-card](https://github.com/prj-july/ha-june-oven/tree/main/docs/july-oven-card)).
   It uses Barlow Semi Condensed / Barlow Condensed type and the oven's black glass in dark.
-  The oven tile follows the card's layout (v0.4.1): the oven's icon as its lamp (orange
+  The oven tile follows the card's layout: the oven's icon as its lamp (orange
   while heating) with its name and a one-tap red Stop, a big number with a status mark
   (↑ preheating, ✓ ready, flame cooking), the heat line and +1/+5/+10 buttons. While
   the oven is on, the camera is its own full-width tile below, with Full screen, Save
@@ -48,8 +52,7 @@ Light / Dark):
   temperature), and glowing mode tiles four across with Camera last; Settings is in the
   top bar. It sizes itself to the phone: the big clock if every row fits, a smaller
   clock to make them fit, and only then does the screen scroll. With several ovens,
-  each is a page you swipe to (or pick with the dots under the top bar). Modes not yet
-  started on a real oven carry a "?". The name tucks into the icon after 5 s. Starting
+  each is a page you swipe to (or pick with the dots under the top bar). The name tucks into the icon after 5 s. Starting
   goes through a review with a slider and a typed temperature, which warns the oven
   must be empty and closes itself after 5 minutes.
 - **July** is the original July Oven design system: warm
@@ -67,7 +70,7 @@ Colours, fonts, type scale and component choices for each theme live in
 | **Set up** | Finds the oven on the home network (or takes a typed address), checks the server (HTTPS first, then the plain listener on port 80 or 8080), optionally takes the home `ca.crt`, and names this phone. |
 | **Pair** | Shows the eight-digit code to type on the oven's Connect screen, with a countdown, then runs the SRP key exchange. |
 | **Oven** | One page per paired oven; swipe (or tap the dots) to switch. Large temperature readout, status, preheat progress, timer countdown and probe reading, and while it's on, a full-width live camera tile with Full screen, Save and Share. Controls for target temperature, timer and *Stop cooking*. |
-| **Start a cook** | Mode, temperature and an optional timer. Bake is proven on a real oven; Roast, Air fry and Broil are names the Home Assistant integration sends. Toast, Pizza, Reheat, Keep warm, Dehydrate, Proof and Slow cook are marked untested: some (Proof, likely Toast) are programs on the oven, which may not start by name. |
+| **Start a cook** | Mode, temperature and an optional timer: Bake, Roast, Air fry, Broil, Toast, Pizza, Reheat, Keep warm, Dehydrate, Proof and Slow cook. Proof and Slow cook need June's presets content on the oven, which the installer can add (it isn't in the public payload). |
 | **Live view** | The camera full screen, with Save (to Photos) and Share. Reads june-local's MJPEG stream; on a server without it, stills at the chosen frame rate (1, 5, 10 or 15 per second). Keeps the camera awake while open. |
 | **Settings** | Theme and light/dark, the paired ovens (show one, add another), the current oven's details, connection and *Forget this oven*, °F/°C, camera frame rate and server status page. With Still Glass, also the home screen choices from the Home Assistant card: the name tucking into the icon, cook modes in the oven's order or most used first, and a 12/24-hour clock. The oven's icon is always the June oven. |
 
@@ -91,11 +94,14 @@ against real ovens.
   The phone acts as the SRP-6a *server* (RFC 5054 8192-bit group, g = 19, SHA-1,
   identity `user`, password = the full eight digits). Session key is `K = BLAKE2b-256(S)`.
   `companion_info` / `oven_info` are NaCl secretbox, with the nonce prepended.
+  The phone registers as `platform: "Android"` on both OSes, as the stock app does.
 - **Commands** (`src/api/client.ts`). These are compact JSON frames in the stock
   app's Gson key order, signed with Ed25519 (`signature = base64(blake2b8(pubkey) || sig)`).
   june-local only relays; the **oven** checks the signature, so only paired phones
   can control it. Acknowledgements (`10020`) are matched by `order` and turned into
-  plain-language errors ("The oven door is open…").
+  plain-language errors ("The oven door is open…"). A temperature change mid-cook
+  sends `11005`; if the oven refuses it, the app restarts the cook at the new
+  temperature, as the Home Assistant integration does.
 - **Live state**. `10013` telemetry (milli-°C), `10014`/`10017` cook plan
   start/end (the probe target comes from the step's `exit_criteria`), `10018`
   device state, `10011` camera frames (re-homed from `api.junelife.com` to the
@@ -140,7 +146,7 @@ To use HTTPS with per-install certs from `generate_certs.sh`, either:
   certificate is often made for `oven.local` and reached by IP.
 - **Opt in to no checks** (same place, off by default): the link is encrypted
   but the oven isn't verified. The screen says so.
-- **Install `ca.crt` on the phone** (as before). Android: Settings → Security →
+- **Install `ca.crt` on the phone**. Android: Settings → Security →
   Encryption & credentials → Install a certificate → CA certificate (the network
   security config from `plugins/withLocalNetwork.js` trusts user CAs). iOS:
   install the profile, then turn it on under Settings → General → About →
@@ -150,7 +156,7 @@ The first two use the app's own native module, `modules/july-tls` (Kotlin and
 Swift), which adds a per-host rule to React Native's fetch and WebSocket. The
 phone's normal checks always run first; a rule only rescues a certificate they
 refuse. It needs a development or EAS build; in Expo Go and on the web, setup
-says so and the app falls back as before.
+says so and the app uses the plain port or a CA installed on the phone.
 
 ## Develop
 
@@ -334,34 +340,22 @@ native binaries), prefix commands with
 ```
 src/app/          screens (Expo Router): index, cook, camera, settings, setup/index, setup/pair
 src/api/          protocol.ts (crypto + frames), pairing.ts, client.ts (live link),
-                  demo.ts, endpoint.ts, modes.ts, pairingCode.ts, discover.ts (network
-                  search), trust.ts (home certificate)
+                  mjpeg.ts (camera stream), demo.ts, endpoint.ts, modes.ts, pairingCode.ts,
+                  discover.ts + scan.ts (network search), trust.ts (home certificate)
 src/state/        OvenProvider (paired oven, live link, preferences, certificate trust), secure storage
 src/components/   shared components, icons, OvenHero (July), GlassHero + glass.tsx (Still Glass)
 src/theme/        themes.ts (Still Glass and July: palettes, fonts, type, looks) and the ThemeProvider
 modules/july-tls/ native module: per-host certificate trust for fetch and WebSocket
 docs/screenshots/ README screenshots (store-assets/ has the Play Store graphics)
 plugins/          Android network security config (user CAs, cleartext for the plain port),
-                  local release signing, Windows native build settings
+                  photo saving permission, local release signing, Windows native build settings
 scripts/          protocol, client, camera, discovery and integration tests;
                   build-apk.mjs (test APK), build-android-release.js (Play AAB)
 ```
 
 ## Known gaps
 
-- **Not yet tested on a real oven.** Protocol behaviour comes from the Home
-  Assistant integration (which does run against ovens) and the reference server.
-  Pair a phone and check every control against a real oven before handing the
-  app to owners.
-- Changing the temperature mid-cook tries `11005`. If the oven refuses, the app
-  restarts the cook at the new temperature, as the Home Assistant integration does.
-- A phone can pair with several ovens, and you swipe between them on the home
-  screen. Each one is still found and paired on its own, with its own code.
-- No recipes or guided programs yet. The installer can
-  now put June's presets content on the oven (not in the public payload), which
-  Proof and Slow Cook load on the oven. Starting those from the phone with
-  `11002` is unverified: the Home Assistant integration offers only Bake, Roast,
-  Broil, Air fry and Toast, and only Bake has been tested on a real oven.
+- **iOS is untested.** It builds from the same code, but nobody has run it on an
+  iPhone against an oven yet.
+- No recipes or guided programs.
 - No way to set a probe target from the phone; the app shows the one the oven reports.
-- Pairing identifies the phone as `platform: "Android"` on both OSes, matching
-  the stock app, because the oven's expectations for other values are unknown.

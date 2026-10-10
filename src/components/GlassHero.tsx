@@ -168,9 +168,9 @@ export function GlassHero(p: Props) {
     // A row: the tile, 7 px, a 20 px label, then 10 px to the next row.
     const rowPitch = tile + 37;
     // The modes, then Camera. Settings lives in the top bar.
-    type Tile = { id: string; label: string; util?: boolean; untested?: boolean };
+    type Tile = { id: string; label: string; util?: boolean };
     const tiles: Tile[] = [
-      ...tileModes(prefs.modeOrder, uses).map((m) => ({ id: m.id, label: m.label, untested: m.untested })),
+      ...tileModes(prefs.modeOrder, uses).map((m) => ({ id: m.id, label: m.label })),
       { id: 'camera', label: 'Camera', util: true },
     ];
     const rowsNeeded = Math.ceil(tiles.length / cols);
@@ -198,11 +198,10 @@ export function GlassHero(p: Props) {
                   mode={t.id}
                   label={t.label}
                   util={t.util}
-                  untested={t.untested}
                   size={tile}
                   labelWidth={tile + gap}
                   onPress={() => (t.id === 'camera' ? p.onCamera() : p.onMode(t.id))}
-                  accessibilityLabel={t.util ? `${t.label} for ${p.name}` : `${t.label}${t.untested ? ', untested' : ''}: review and start`}
+                  accessibilityLabel={t.util ? `${t.label} for ${p.name}` : `${t.label}: review and start`}
                 />
               ))}
               {/* Keep a short last row on the grid. */}
