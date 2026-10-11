@@ -24,8 +24,8 @@ local `june-local` server over the home network, with no June cloud involved.
 
 The **Android** app is tested on real ovens: pairing, starting and stopping cooks,
 temperature and timer changes, the probe, the live camera and several ovens on
-one phone. One Expo / React Native codebase also builds for **iOS**, but that
-version hasn't been tested on an iPhone yet.
+one phone. The **iOS** app, built from the same Expo / React Native codebase, has
+been tested on an iPhone too.
 
 <p align="center">
   <img src="docs/screenshots/welcome.png" width="160" alt="Welcome screen: Your oven keeps working, with Set up this phone and Try the demo first">
@@ -360,8 +360,6 @@ scripts/          protocol, client, camera, discovery and integration tests;
 
 ## Known gaps
 
-- **iOS is untested.** It builds from the same code, but nobody has run it on an
-  iPhone against an oven yet.
 - No recipes or guided programs.
 - No way to set a probe target from the phone; the app shows the one the oven reports.
   A phone start is refused while a probe is plugged in, so probe cooks (a probe on
