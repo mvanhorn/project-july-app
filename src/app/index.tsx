@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWi
 import { router, useIsFocused } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OvenError, type OvenLink, type OvenSnapshot } from '@/api/client';
-import { MODES, fToC, show, formatDuration } from '@/api/modes';
+import { MODES, fToC, isFixed, show, formatDuration } from '@/api/modes';
 import { CameraTile } from '@/components/CameraTile';
 import { DONE_WINDOW_MS, GlassHero } from '@/components/GlassHero';
 import { Icon, JulyMark, type IconName } from '@/components/Icon';
@@ -249,7 +249,7 @@ function OvenPage({ entry, visible }: { entry: OvenEntry; visible: boolean }) {
             stopping={busy === 'cancel'}
             onAddMinutes={(min) => run('timer', () => link.setTimer((left ?? 0) + min * 60_000))}
             onMode={(mode) => open({ pathname: '/cook', params: { mode } })}
-            onRepeat={(mode, tempF) => open({ pathname: '/cook', params: { mode, temp: String(tempF) } })}
+            onRepeat={(mode, tempF, plan) => open({ pathname: '/cook', params: { mode, temp: String(tempF), ...(plan === undefined ? {} : { plan: String(plan) }) } })}
             onCamera={() => open('/camera')}
             lastCook={lastCooks[entry.id] ?? null}
             done={done}
@@ -332,10 +332,14 @@ function ActiveControls({ s, link, unit, busy, run }: {
   const left = remainingNow(s, now);
   // On glass the card already carries Stop and the +1/+5/+10 buttons.
   const glass = look.hero === 'glass';
+  // The running mode's own range; a mode the oven sets the temperature for (toast, broil,
+  // grill's heat, reheat…) has no − / +: a change would only run its plan at the wrong heat.
+  const running = MODES.find((m) => m.id === s.mode);
+  const tunable = !running || (!isFixed(running) && !running.plans);
 
   function nudge(dir: 1 | -1) {
-    if (shownTarget === null) return;
-    const lo = fToC(100), hi = fToC(450);
+    if (shownTarget === null || !tunable) return;
+    const lo = fToC(running?.minF ?? 100), hi = fToC(running?.maxF ?? 450);
     const next = Math.min(hi, Math.max(lo, shownTarget + dir * step));
     setPendingC(next);
     if (debounce.current) clearTimeout(debounce.current);
@@ -352,14 +356,14 @@ function ActiveControls({ s, link, unit, busy, run }: {
         <View style={{ gap: space[3] }}>
           <SectionLabel>Target temperature</SectionLabel>
           <View style={styles.stepper}>
-            <RoundButton icon="minus" label={`Lower by 5 degrees`} onPress={() => nudge(-1)} />
+            {tunable ? <RoundButton icon="minus" label={`Lower by 5 degrees`} onPress={() => nudge(-1)} /> : null}
             <View style={{ alignItems: 'center', flex: 1 }}>
               <Text style={{ fontFamily: f.number, fontSize: glass ? 56 : 48, lineHeight: glass ? 58 : 54, color: c.ink, fontVariant: ['tabular-nums'] }}>
                 {show(shownTarget, unit)}°
               </Text>
-              <T v="small" muted>{busy === 'temp' ? 'Sending to the oven…' : pendingC !== null ? 'Setting…' : unit === 'F' ? 'Fahrenheit' : 'Celsius'}</T>
+              <T v="small" muted>{busy === 'temp' ? 'Sending to the oven…' : pendingC !== null ? 'Setting…' : !tunable ? 'Set by the oven' : unit === 'F' ? 'Fahrenheit' : 'Celsius'}</T>
             </View>
-            <RoundButton icon="plus" label={`Raise by 5 degrees`} onPress={() => nudge(1)} />
+            {tunable ? <RoundButton icon="plus" label={`Raise by 5 degrees`} onPress={() => nudge(1)} /> : null}
           </View>
         </View>
       </Card>

@@ -16,7 +16,7 @@ import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { OvenSnapshot } from '@/api/client';
-import { fToC, formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
+import { cookSummary, formatDuration, modeLabel, show, tileModes, type Unit } from '@/api/modes';
 import { useOven, type LastCook } from '@/state/oven';
 import { space, useTheme } from '@/theme';
 import { GlassFill, ModeTile, StatusLine, type MarkKind } from './glass';
@@ -41,7 +41,7 @@ type Props = {
   onAddMinutes: (min: number) => void;
   onMode: (mode: string) => void;
   /** Open the review for the last cook again (mode and °F). */
-  onRepeat: (mode: string, tempF: number) => void;
+  onRepeat: (mode: string, tempF: number, plan?: number) => void;
   /** This oven's last cook started from this phone, for Repeat. */
   lastCook: LastCook | null;
   /** Open the camera full screen (the Camera tile on the home screen). */
@@ -211,7 +211,7 @@ export function GlassHero(p: Props) {
         </View>
       );
     };
-    const lastTemp = last ? (p.unit === 'F' ? `${last.tempF} °F` : `${Math.round(fToC(last.tempF))} °C`) : '';
+    const lastCook = last ? cookSummary(last.mode, last.tempF, last.plan, p.unit) : '';
     return (
       <View ref={boxRef} onLayout={onLayout} style={{ paddingTop: space[2] }}>
         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space[2] }}>
@@ -228,12 +228,12 @@ export function GlassHero(p: Props) {
           // Repeat opens the review with the same mode and temperature: nothing heats until Start.
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Repeat the last cook, ${modeLabel(last.mode)} at ${lastTemp}: review and start`}
-            onPress={() => p.onRepeat(last.mode, last.tempF)}
+            accessibilityLabel={`Repeat the last cook, ${lastCook}: review and start`}
+            onPress={() => p.onRepeat(last.mode, last.tempF, last.plan)}
             style={({ pressed }) => [styles.last, { borderRadius: r.md, borderColor: c.line, backgroundColor: pressed ? c.surfaceSunken : 'transparent' }]}
           >
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 21, color: c.ink }}>{`Last cook: ${modeLabel(last.mode)} ${lastTemp}`}</Text>
+              <Text numberOfLines={1} style={{ fontFamily: f.sansMedium, fontSize: 16, lineHeight: 21, color: c.ink }}>{`Last cook: ${lastCook}`}</Text>
               <Text numberOfLines={1} style={{ fontFamily: f.sans, fontSize: 14, lineHeight: 19, color: c.inkMuted }}>{when(last.at, now)}</Text>
             </View>
             <Text style={{ fontFamily: f.sansStrong, fontSize: 16, color: c.ember }}>Repeat</Text>

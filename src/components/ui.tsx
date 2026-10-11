@@ -388,6 +388,12 @@ export function ProgressBar({ value, color, kind = 'heat' }: { value: number; co
   );
 }
 
+/** A message with an OK button (window.alert on web, where Alert.alert does nothing). */
+export function tell(title: string, message: string) {
+  if (Platform.OS === 'web') globalThis.alert?.(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+}
+
 /** Alert.alert does nothing on web; fall back to window.confirm there. */
 export function confirm(title: string, message: string, confirmLabel: string): Promise<boolean> {
   if (Platform.OS === 'web') return Promise.resolve(globalThis.confirm?.(`${title}\n\n${message}`) ?? true);

@@ -16,6 +16,7 @@ export const CLIENT_SECRET = 'tmoSUwt3OOZCcfMaIadAGD7-x-qPht85HkCgdvuhTKk1yFtfMc
 
 export const MC = {
   VideoFrame: 10011, Notification: 10012, CookingState: 10013, CookPlanStarted: 10014,
+  CookPlan: 10015, CookPlanTemp: 10016,
   CookPlanEnded: 10017, DeviceState: 10018, Ack: 10020, Unpaired: 10022,
   PairingInfo: 10026, PairingInvalidated: 10027,
   Preheat: 11002, Cancel: 11004, SetCavityTemp: 11005, SetTimer: 11006, SetProbeTarget: 11007,

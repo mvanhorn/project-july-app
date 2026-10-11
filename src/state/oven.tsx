@@ -58,7 +58,8 @@ const DEFAULT_PREFS: Prefs = { unit: 'F', cameraFps: 15, hideName: true, clock: 
 export type Uses = Record<string, number>;
 
 /** The last cook started from this phone, for Repeat on the home screen. */
-export type LastCook = { mode: string; tempF: number; at: number };
+/** `plan`: the toast level or grill heat (11002 plan_index), for modes that have plans. */
+export type LastCook = { mode: string; tempF: number; plan?: number; at: number };
 /** Last cook per oven id (paired ovens only; the demo's are kept in memory). */
 const LAST_COOKS_KEY = 'july.lastcooks.v1';
 /** Before several ovens: the one last cook. Moved to the first oven on load. */
@@ -94,7 +95,7 @@ type Ctx = {
   /** Last cook per oven id, for Repeat on each oven's page. */
   lastCooks: Record<string, LastCook>;
   /** Remember a cook the current oven accepted, for Repeat. */
-  recordCook(mode: string, tempF: number): void;
+  recordCook(mode: string, tempF: number, plan?: number): void;
   trusts: Record<string, Trust>;
   /** Trust `host`'s certificate this way from now on (saved), or only as the phone does (null). */
   setHostTrust(host: string, trust: Trust | null): void;
@@ -274,9 +275,9 @@ export function OvenProvider({ children }: { children: ReactNode }) {
     const ids = new Set(realRef.current.map((o) => o.id));
     save(LAST_COOKS_KEY, Object.fromEntries(Object.entries(all).filter(([id]) => ids.has(id)))).catch(() => {});
   }, []);
-  const recordCook = useCallback((mode: string, tempF: number) => {
+  const recordCook = useCallback((mode: string, tempF: number, plan?: number) => {
     if (!currentId) return;
-    const cook = { mode, tempF, at: Date.now() };
+    const cook: LastCook = { mode, tempF, plan, at: Date.now() };
     setLastCooks((all) => { const next = { ...all, [currentId]: cook }; saveCooks(next); return next; });
   }, [currentId, saveCooks]);
   const countUse = useCallback((mode: string) => {

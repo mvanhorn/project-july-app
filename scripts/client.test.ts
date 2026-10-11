@@ -143,6 +143,83 @@ async function main() {
     assert.deepEqual(sent.map((s) => s.code), [MC.SetCavityTemp]);
     console.log('✓ refused 11005 on a mode the phone cannot start leaves it running');
   }
+  // --- timers and temperatures name the running cook's plan ------------------------
+  // Home Assistant integration v0.5.16: a reheat timer sent 5 ms after the start ack
+  // named the previous plan (0) while reheat ran as plan 2; the next 11004 rebooted the oven.
+  LiveOven.planWaitMs = 500;
+  /** The real order: 11002 is acknowledged first, its plan reported later by the test. */
+  const ackOnly: Oven = () => 'success';
+  const later = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  {
+    const { link, emit, sent } = rig(ackOnly);
+    await link.preheat('reheat', 176.667);
+    const timer = link.setTimer(60 * 60_000);
+    await later(100);
+    assert.deepEqual(sent.map((s) => s.code), [MC.Preheat], 'nothing goes out before the plan');
+    emit(MC.DeviceState, { state: 'active' });
+    emit(MC.CookPlanStarted, plan('reheat', 2, 176_667));
+    await timer;
+    assert.deepEqual(sent[1], { code: MC.SetTimer, data: { plan_id: 2, duration: 3_600_000 } });
+    console.log('✓ a timer right after a start waits for the new plan and names it');
+  }
+  {
+    const { link, emit, sent } = rig(ackOnly);
+    emit(MC.CookPlanStarted, plan('bake', 7, 176_667));
+    // Restarted while cooking: the oven stays active, but plan 7 is gone.
+    await link.preheat('reheat', 176.667);
+    const timer = link.setTimer(10 * 60_000);
+    await later(100);
+    // The replaced bake's telemetry is still in flight: it must not pass for the new plan.
+    emit(MC.CookingState, { sensor_data: { cavity: 170_000 }, cook_plan_data: plan('bake', 7, 176_667) });
+    await later(100);
+    assert.equal(sent.length, 1);
+    emit(MC.CookingState, { sensor_data: { cavity: 100_000 }, cook_plan_data: plan('reheat', 8, 176_667) });
+    await timer;
+    assert.equal(sent[1].data.plan_id, 8);
+    console.log('✓ a timer after restarting a running cook waits for the new plan, not the old one\'s telemetry');
+  }
+  {
+    const { link, emit, sent } = rig(ackOnly);
+    emit(MC.CookPlanStarted, plan('bake', 7, 176_667));
+    await link.preheat('roast', 204.444);
+    const stop = link.cancel();
+    await later(100);
+    emit(MC.CookPlanStarted, plan('roast', 9, 204_444));
+    await stop;
+    assert.deepEqual(sent[1], { code: MC.Cancel, data: { plan_id: 9 } });
+    console.log('✓ Stop right after a start names the new cook\'s plan');
+  }
+  {
+    const { link, sent } = rig(ackOnly);
+    await link.preheat('bake', 176.667);
+    await rejects(link.setTimer(60_000), 'no-plan');
+    await rejects(link.setTemperature(190), 'no-plan');
+    assert.deepEqual(sent.map((s) => s.code), [MC.Preheat]);
+    console.log('✓ with no plan reported, the timer and temperature are refused, never sent');
+  }
+  {
+    const { link, emit, sent } = rig(ackOnly);
+    emit(MC.CookPlanStarted, plan('bake', 3, 176_667));
+    await link.setTimer(60_000);
+    assert.equal(sent[0].data.plan_id, 3);
+    console.log('✓ a cook already reported running gets its timer at once');
+  }
+  {
+    const { link, sent } = rig(oven('success'));
+    await link.preheat('grill', 204.444, 1);
+    assert.deepEqual(sent[0].data, { primitive_type: 'grill', temperature_cavity: 204444, plan_index: 1 });
+    console.log('✓ grill sends its heat level as plan_index');
+  }
+  {
+    // Level 5 is plan 4 at the toast plan's 500 °F (chef-cookmodes: 260000 milli-°C).
+    const { link, sent } = rig(oven('success'));
+    await link.preheat('toast', 260, 4);
+    assert.deepEqual(sent[0].data, { primitive_type: 'toast', temperature_cavity: 260000, plan_index: 4 });
+    const bake = rig(oven('success'));
+    await bake.link.preheat('bake', 176.667);
+    assert.equal('plan_index' in bake.sent[0].data, false);
+    console.log('✓ toast sends its level as plan_index; modes without plans send none');
+  }
   console.log('all client checks passed');
 }
 

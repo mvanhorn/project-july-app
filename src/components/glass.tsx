@@ -149,8 +149,8 @@ export function StatusLine({ kind, word, qualifier, size = 'normal' }: { kind: M
 }
 
 // --- Mode glyphs: the heating elements each mode uses -----------------------------
-// bake, broil, roast, toast, airfry, camera and settings are the card's own; the rest are
-// drawn to the same rules (48 box, 4 px stroke, 3 px for thin parts).
+// The card's own (july-oven-card.js GLYPH, v0.5.16), except slow cook, which the card can't
+// start: drawn to the same rules (48 box, 4 px stroke, 3 px for thin parts).
 
 export function ModeGlyph({ mode, color, size, glow, fan }: {
   mode: string; color: string; size: number; glow?: string;
@@ -251,6 +251,8 @@ function useFanSpin(enabled: boolean): FanSpin | null {
 function glyphBody(mode: string, color: string, w: number, wThin: number): ReactNode {
   const s = { stroke: color, strokeWidth: w, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   const thin = { ...s, strokeWidth: wThin };
+  // A filled shape. The glow layers stroke it as wide as they stroke lines past 4 px, so it haloes too.
+  const dot = { fill: color, stroke: w > 4 ? color : 'none', strokeWidth: Math.max(0, w - 4) };
   return ((): ReactNode => {
     switch (mode) {
       case 'bake': return <Path d="M10 37h28" {...s} />;
@@ -261,26 +263,27 @@ function glyphBody(mode: string, color: string, w: number, wThin: number): React
       // Air fry in two layers, so the fan can turn inside its ring.
       case 'airfry-ring': return <Circle cx={24} cy={24} r={12.5} {...thin} />;
       case 'airfry-fan': return (<>
-        {[0, 120, 240].map((a) => <Path key={a} transform={`rotate(${a} 24 24)`} d="M24 24c-1.5-5.5 1-9.5 5-9.2 2.6.3 2.8 4.4-5 9.2z" fill={color} />)}
+        {[0, 120, 240].map((a) => <Path key={a} transform={`rotate(${a} 24 24)`} d="M24 24c-1.5-5.5 1-9.5 5-9.2 2.6.3 2.8 4.4-5 9.2z" {...dot} />)}
       </>);
+      // Grill: the oven's diagonal grill marks. Pizza: a slice (the card's pick over the oven's peel).
+      case 'grill': return <Path d="M11 19l8-8M11 29l18-18M11 38.5L38.5 11M20 38.5l18.5-18.5M30 38.5l8.5-8.5" {...s} />;
       case 'pizzaiolo': return (<>
-        <Path d="M10 11h28M10 37h28" {...s} />
-        <Path d="M16 30.5 24 17l8 13.5Z" {...thin} />
+        <Path d="M10.5 15.5Q24 7 37.5 15.5L24 40Z" {...thin} />
+        <Path d="M13.5 20.5Q24 14 34.5 20.5" {...thin} />
+        <Circle cx={20.5} cy={25.5} r={2.4} {...dot} />
+        <Circle cx={27.5} cy={27} r={2.4} {...dot} />
+        <Circle cx={24} cy={33} r={2} {...dot} />
       </>);
-      case 'reheat': return (<>
-        <Path d="M10 37h28" {...s} />
-        <Path d="M31 23.5a7.5 7.5 0 1 1-2.6-5.7" {...thin} />
-        <Path d="M29.5 13.5v5h-5" {...thin} />
+      // The oven's own Reheat, Keep warm and Dehydrate tiles; Proof is dough rising over the bottom element.
+      case 'reheat': return <Path d={[14, 24, 34].map((x) => `M${x} 11.5c2.6 2.8 2.6 5.7 0 8.5s-2.6 5.7 0 8.5 2.6 5.7 0 8.5`).join('')} {...s} />;
+      case 'warm': return (<>{[14, 24, 34].map((x) => <Circle key={x} cx={x} cy={24} r={4} {...dot} />)}</>);
+      case 'dehydrate': return (<>
+        <Circle cx={24} cy={24} r={7.5} {...dot} />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => <Path key={a} transform={`rotate(${a} 24 24)`} d="M24 8.5v3.5" {...thin} />)}
       </>);
-      case 'warm': return (<>
-        <Path d="M10 37h28" {...s} />
-        <Path d="M17 29c-2.5-3 2.5-5 0-8.5M24 29c-2.5-3 2.5-5 0-8.5M31 29c-2.5-3 2.5-5 0-8.5" {...thin} />
-      </>);
-      case 'dehydrate': return <Path d="M24 11c5.5 7 9 11.5 9 16a9 9 0 0 1-18 0c0-4.5 3.5-9 9-16Z" {...thin} />;
       case 'proof': return (<>
+        <Path d="M14 30v-2.5c0-5.8 4.5-10 10-10s10 4.2 10 10v2.5z" {...s} fill={color} />
         <Path d="M10 37h28" {...s} />
-        <Path d="M13 31c0-7 5-11 11-11s11 4 11 11" {...thin} />
-        <Path d="M24 15v-4M19.5 12.5 24 11l4.5 1.5" {...thin} />
       </>);
       case 'slow_cook': return (<>
         <Path d="M10 37h28" {...s} />

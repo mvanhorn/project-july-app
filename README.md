@@ -70,7 +70,7 @@ Colours, fonts, type scale and component choices for each theme live in
 | **Set up** | Finds the oven on the home network (or takes a typed address), checks the server (HTTPS first, then the plain listener on port 80 or 8080), optionally takes the home `ca.crt`, and names this phone. |
 | **Pair** | Shows the eight-digit code to type on the oven's Connect screen, with a countdown, then runs the SRP key exchange. |
 | **Oven** | One page per paired oven; swipe (or tap the dots) to switch. Large temperature readout, status, preheat progress, timer countdown and probe reading, and while it's on, a full-width live camera tile with Full screen, Save and Share. Controls for target temperature, timer and *Stop cooking*. |
-| **Start a cook** | Mode, temperature and an optional timer: Bake, Roast, Air fry, Broil, Toast, Pizza, Reheat, Keep warm, Dehydrate, Proof and Slow cook. Proof and Slow cook need June's presets content on the oven, which the installer can add (it isn't in the public payload). |
+| **Start a cook** | Mode, temperature and an optional timer: Bake, Roast, Air fry, Broil, Toast, Grill, Pizza, Reheat, Keep warm, Dehydrate and Proof, as on the Home Assistant card. Toast takes a level from 1 (light) to 9 (dark) and times itself. Grill takes the oven's Low, Medium or High heat. Reheat runs at the 350 °F the oven sets, and its one control is a timer from 1 minute to 10 hours (an hour unless changed). Broil, Pizza and Keep warm run at the temperature the oven sets (500, 500 and 170 °F). Proof needs June's presets content on the oven, which the installer can add (it isn't in the public payload). |
 | **Live view** | The camera full screen, with Save (to Photos) and Share. Reads june-local's MJPEG stream; on a server without it, stills at the chosen frame rate (1, 5, 10 or 15 per second). Keeps the camera awake while open. |
 | **Settings** | Theme and light/dark, the paired ovens (show one, add another), the current oven's details, connection and *Forget this oven*, °F/°C, camera frame rate and server status page. With Still Glass, also the home screen choices from the Home Assistant card: the name tucking into the icon, cook modes in the oven's order or most used first, and a 12/24-hour clock. The oven's icon is always the June oven. |
 
@@ -101,7 +101,12 @@ against real ovens.
   can control it. Acknowledgements (`10020`) are matched by `order` and turned into
   plain-language errors ("The oven door is open…"). A temperature change mid-cook
   sends `11005`; if the oven refuses it, the app restarts the cook at the new
-  temperature, as the Home Assistant integration does.
+  temperature, as the Home Assistant integration does. A timer (`11006`) or
+  temperature change names the running cook's plan, so right after a start the app
+  waits (up to 3 s) for the oven to report the new plan: the oven acknowledges a
+  start before it reports the plan, and a timer sent with the previous plan id
+  made the next Stop reboot the oven (Home Assistant integration v0.5.16). Grill's
+  heat level goes in the start as `plan_index` (0 High, 1 Medium, 2 Low).
 - **Live state**. `10013` telemetry (milli-°C), `10014`/`10017` cook plan
   start/end (the probe target comes from the step's `exit_criteria`), `10018`
   device state, `10011` camera frames (re-homed from `api.junelife.com` to the
@@ -359,3 +364,17 @@ scripts/          protocol, client, camera, discovery and integration tests;
   iPhone against an oven yet.
 - No recipes or guided programs.
 - No way to set a probe target from the phone; the app shows the one the oven reports.
+  A phone start is refused while a probe is plugged in, so probe cooks (a probe on
+  Reheat too) start on the oven.
+- **Slow cook** isn't offered, here or in the Home Assistant integration. On the oven
+  it is a choice of High or Low power, like Grill without Medium: `plan_index` 0 High
+  (320 °F, `temperature_cavity` 160000) or 1 Low (284 °F, 140000). The installer's
+  Chef patch refuses a remote `slow_cook` (`not-allowed`): its plans carry 0-duration
+  steps until the oven's own screen sets a duration, and an earlier patch that let it
+  through rebooted the oven. To add it: a duration with the start (`duration_ms`) in
+  the installer, then a High / Low choice and a required timer in the review (Grill's
+  picker and Reheat's timer).
+- **Sous vide** isn't offered yet, pending a test on a real oven. The stock Chef app
+  already accepts it remotely: `primitive_type: "sous_vide"`, one plan at 60 °C
+  (140 °F). To try: start it from the phone, then check the oven runs it, a
+  temperature change (`11005`) and a timer, and Stop.

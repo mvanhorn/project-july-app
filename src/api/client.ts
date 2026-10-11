@@ -57,7 +57,8 @@ export interface OvenLink {
   subscribe(fn: (s: OvenSnapshot) => void): () => void;
   start(): void;
   stop(): void;
-  preheat(mode: string, tempC: number): Promise<void>;
+  /** `planIndex` picks one of the mode's plans (grill heat); without it the oven runs its default. */
+  preheat(mode: string, tempC: number, planIndex?: number): Promise<void>;
   cancel(): Promise<void>;
   setTemperature(tempC: number): Promise<void>;
   setTimer(ms: number): Promise<void>;
@@ -172,6 +173,19 @@ export class LiveOven implements OvenLink {
   private retry = 0;
   private stopped = true;
   private preheatDone = false;
+  /**
+   * Whether `planId` is the running cook's. A timer or temperature change names a
+   * plan, and the oven acknowledges a start (10020) before it reports the new plan
+   * (10014/10013): sent in that window, it names the previous plan and cancelling
+   * the cook afterwards reboots the oven (Home Assistant integration v0.5.16). A
+   * start or the end of a cook clears it; the oven's next plan report sets it.
+   */
+  private planCurrent = false;
+  /** A start is waiting for its plan: june-local's REST status still serves the old one. */
+  private startPending = false;
+  /** The plan a pending start replaces, whose telemetry may still arrive (see planReported). */
+  private replacedPlan: number | null = null;
+  static planWaitMs = 3000;
 
   constructor(private p: Paired) {}
 
@@ -255,8 +269,12 @@ export class LiveOven implements OvenLink {
         const t = planTarget(plan);
         if (t.targetC !== null) patch.targetC = t.targetC;
         if (t.mode) patch.mode = t.mode;
-        if (t.planId !== null) patch.planId = t.planId;
+        if (t.planId !== null && !this.startPending) {
+          patch.planId = t.planId;
+          this.planCurrent = true;
+        }
       }
+      if (patch.active === false) this.planCurrent = false;
       this.set(patch);
     } catch {
       if (this.s.link !== 'online') this.set({ ovenOnline: null });
@@ -294,7 +312,7 @@ export class LiveOven implements OvenLink {
           if (t.targetC !== null) patch.targetC = t.targetC;
           patch.probeTargetC = t.probeTargetC;
           if (t.mode) patch.mode = t.mode;
-          if (t.planId !== null) patch.planId = t.planId;
+          if (t.planId !== null) this.planReported(patch, t.planId);
         }
         this.set(patch);
         return;
@@ -302,15 +320,30 @@ export class LiveOven implements OvenLink {
       case MC.CookPlanStarted: {
         const t = planTarget(d);
         this.preheatDone = false;
-        this.set({ active: true, ended: null, targetC: t.targetC, probeTargetC: t.probeTargetC, mode: t.mode, planId: t.planId ?? 0 });
+        const patch: Partial<OvenSnapshot> = { active: true, ended: null, targetC: t.targetC, probeTargetC: t.probeTargetC, mode: t.mode, planId: t.planId ?? 0 };
+        if (t.planId !== null) this.planReported(patch, t.planId, true);
+        this.set(patch);
+        return;
+      }
+      // The running plan again (10015), or after a temperature change (10016).
+      case MC.CookPlan:
+      case MC.CookPlanTemp: {
+        if (!this.s.active || !d.food) return;
+        const t = planTarget(d);
+        const patch: Partial<OvenSnapshot> = { probeTargetC: t.probeTargetC };
+        if (t.targetC !== null) patch.targetC = t.targetC;
+        if (t.mode) patch.mode = t.mode;
+        if (t.planId !== null) this.planReported(patch, t.planId);
+        this.set(patch);
         return;
       }
       case MC.CookPlanEnded:
         this.preheatDone = false;
+        this.planCurrent = false;
         this.set({ active: false, ended: d.type === 'completed' ? 'completed' : 'cancelled', endedAt: Date.now(), progress: null, remainingMs: null, probeTargetC: null, offer: null });
         return;
       case MC.DeviceState:
-        if (d.state === 'idle') this.preheatDone = false;
+        if (d.state === 'idle') this.preheatDone = this.planCurrent = false;
         this.set({ active: d.state === 'active', ovenOnline: true });
         return;
       case MC.Notification:
@@ -355,20 +388,65 @@ export class LiveOven implements OvenLink {
     if (!status || !ok.includes(status)) throw ackError(status);
   }
 
-  async preheat(mode: string, tempC: number) {
+  /**
+   * A plan id from the oven. While a start waits, the cook it replaces can still report its
+   * plan (10013 comes about every second): only the start's own 10014, or a plan other than
+   * the one replaced, is the new cook's.
+   */
+  private planReported(patch: Partial<OvenSnapshot>, planId: number, started = false) {
+    if (this.startPending && !started && planId === this.replacedPlan) return;
+    patch.planId = planId;
+    this.planCurrent = true;
+    this.startPending = false;
+  }
+
+  /**
+   * The plan id of the running cook, waiting out a start until the oven reports
+   * its plan (see planCurrent). Throws rather than name a plan that isn't running.
+   */
+  private async runningPlan(what: string): Promise<number> {
+    const deadline = Date.now() + LiveOven.planWaitMs;
+    while (!(this.s.active && this.planCurrent)) {
+      if (Date.now() >= deadline) throw new OvenError(`The oven hasn't reported the cook yet, so ${what}. Try again in a moment.`, 'no-plan');
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return this.s.planId;
+  }
+
+  async preheat(mode: string, tempC: number, planIndex?: number) {
     this.preheatDone = false;
-    await this.must(MC.Preheat, { primitive_type: mode, temperature_cavity: Math.round(tempC * 1000) });
+    // A start replaces any running cook, so its plan id no longer applies.
+    const wasCurrent = this.planCurrent;
+    this.replacedPlan = wasCurrent && this.s.active ? this.s.planId : null;
+    this.planCurrent = false;
+    this.startPending = true;
+    const data: Record<string, unknown> = { primitive_type: mode, temperature_cavity: Math.round(tempC * 1000) };
+    if (planIndex !== undefined) data.plan_index = planIndex;
+    try {
+      await this.must(MC.Preheat, data);
+    } catch (e) {
+      // Refused outright: whatever was running still is, under the plan it had. An
+      // unanswered start may still have gone through, so its plan stays unknown.
+      if (!(e instanceof OvenError && e.code === 'timeout')) {
+        this.startPending = false;
+        this.planCurrent = wasCurrent;
+      }
+      throw e;
+    }
     this.set({ active: true, ended: null, mode, targetC: tempC });
   }
 
   async cancel() {
-    await this.must(MC.Cancel, { plan_id: this.s.planId }, ['success', 'not-allowed']);
+    // Just after a start, stop the new cook by its own plan once the oven reports it.
+    const planId = this.startPending ? await this.runningPlan('').catch(() => this.s.planId) : this.s.planId;
+    await this.must(MC.Cancel, { plan_id: planId }, ['success', 'not-allowed']);
     this.preheatDone = false;
     this.set({ active: false, ended: 'cancelled', progress: null, remainingMs: null, probeTargetC: null });
   }
 
   async setTemperature(tempC: number) {
-    const status = await this.command(MC.SetCavityTemp, { plan_id: this.s.planId, temperature_cavity: Math.round(tempC * 1000) });
+    const planId = await this.runningPlan('the temperature wasn’t changed');
+    const status = await this.command(MC.SetCavityTemp, { plan_id: planId, temperature_cavity: Math.round(tempC * 1000) });
     if (status === 'success') { this.set({ targetC: tempC }); return; }
     // Some firmware rejects a live change; restart the cook at the new temperature,
     // as the Home Assistant integration does. Only after a definite refusal (a
@@ -377,14 +455,15 @@ export class LiveOven implements OvenLink {
     // (plan 114) share a mode name but can't be restarted from here. Toast is
     // startable but never restarted (see CookMode.noRestart).
     const mode = this.s.mode;
-    if (status === null || !mode || this.s.planId !== 0 || !MODES.some((m) => m.id === mode && !m.noRestart)) throw ackError(status);
+    if (status === null || !mode || planId !== 0 || !MODES.some((m) => m.id === mode && !m.noRestart)) throw ackError(status);
     await this.cancel();
     await new Promise((r) => setTimeout(r, 400));
     await this.preheat(mode, tempC);
   }
 
   async setTimer(ms: number) {
-    await this.must(MC.SetTimer, { plan_id: this.s.planId, duration: Math.round(ms) });
+    const planId = await this.runningPlan('the timer wasn’t set');
+    await this.must(MC.SetTimer, { plan_id: planId, duration: Math.round(ms) });
     this.set({ remainingMs: ms, remainingAt: Date.now() });
   }
 
