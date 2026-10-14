@@ -25,5 +25,10 @@
       "autoIncrement": true,
       "channel": "production"
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
+    }
   }
 }
