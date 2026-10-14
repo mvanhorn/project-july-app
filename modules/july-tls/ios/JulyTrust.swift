@@ -1,3 +1,4 @@
+import ExpoModulesCore
 import Foundation
 import ObjectiveC
 import Security
@@ -6,8 +7,8 @@ struct InvalidCertificate: Error, CustomStringConvertible {
   var description: String { "That isn't a certificate in PEM form (-----BEGIN CERTIFICATE-----)." }
 }
 
-/// Per-host certificate trust for React Native's fetch (RCTHTTPRequestHandler's
-/// NSURLSession) and WebSocket (SocketRocket's SRSecurityPolicy).
+/// Per-host certificate trust for fetch (expo/fetch's NSURLSession, and React
+/// Native's RCTHTTPRequestHandler) and WebSocket (SocketRocket's SRSecurityPolicy).
 ///
 /// The phone's own trust is always tried first. Only when it refuses a certificate
 /// does a host's rule apply:
@@ -77,10 +78,12 @@ enum JulyTrust {
     installWebSocket()
   }
 
-  // fetch: RCTHTTPRequestHandler is its NSURLSession's delegate and has no
-  // authentication-challenge method, so one is added. Unknown hosts get the default.
+  // fetch: the app's fetch is expo/fetch (Expo SDK 57 installs it globally), whose
+  // NSURLSession delegate is ExpoModulesCore's URLSessionSessionDelegateProxy;
+  // React Native's own networking (RCTHTTPRequestHandler) still serves XHR. Neither
+  // delegate has a session-level challenge method, so one is added to both.
+  // Unknown hosts get the default.
   private static func installFetch() {
-    guard let cls = NSClassFromString("RCTHTTPRequestHandler") else { return }
     let sel = NSSelectorFromString("URLSession:didReceiveChallenge:completionHandler:")
     typealias Completion = @convention(block) (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     let block: @convention(block) (AnyObject, URLSession, URLAuthenticationChallenge, Completion) -> Void = { _, _, challenge, completion in
@@ -96,8 +99,11 @@ enum JulyTrust {
         completion(.cancelAuthenticationChallenge, nil)
       }
     }
-    // If a later React Native adds its own, leave it be rather than replace it.
-    class_addMethod(cls, sel, imp_implementationWithBlock(block), "v@:@@@?")
+    // If a later version adds its own, leave it be rather than replace it.
+    let delegates: [AnyClass?] = [URLSessionSessionDelegateProxy.self, NSClassFromString("RCTHTTPRequestHandler")]
+    for case let cls? in delegates {
+      class_addMethod(cls, sel, imp_implementationWithBlock(block), "v@:@@@?")
+    }
   }
 
   private static var anyRules: Bool {

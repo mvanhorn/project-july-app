@@ -7,7 +7,7 @@ class JulyTlsModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("JulyTls")
 
-    OnCreate { JulyTrust.install() }
+    OnCreate { JulyTrust.install(appContext.reactContext?.applicationContext) }
 
     // A host's own trust rule: its home CA (PEM), or no checks at all. The phone's
     // normal trust still applies first; a rule only rescues a certificate it refuses.

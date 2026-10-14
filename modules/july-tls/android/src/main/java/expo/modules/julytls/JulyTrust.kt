@@ -1,7 +1,9 @@
 package expo.modules.julytls
 
+import android.content.Context
 import com.facebook.react.modules.network.CustomClientBuilder
 import com.facebook.react.modules.network.NetworkingModule
+import com.facebook.react.modules.network.OkHttpClientProvider
 import com.facebook.react.modules.websocket.WebSocketModule
 import java.io.ByteArrayInputStream
 import java.net.Socket
@@ -20,7 +22,8 @@ import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
 
 /**
- * Per-host certificate trust for React Native's fetch and WebSocket (both OkHttp).
+ * Per-host certificate trust for fetch (expo/fetch, and React Native's networking)
+ * and WebSocket, all OkHttp.
  *
  * The phone's own trust (system CAs, plus user CAs through network_security_config)
  * is always tried first. Only when it refuses a certificate does a host's rule apply:
@@ -114,12 +117,26 @@ object JulyTrust {
     HttpsURLConnection.getDefaultHostnameVerifier().verify(host, session) || rules.containsKey(bare(host))
   }
 
-  fun install() {
+  private var installed = false
+
+  /** From JulyTlsPackage as the app starts; the module's OnCreate is the fallback. */
+  @Synchronized
+  fun install(context: Context?) {
+    if (installed) return
+    installed = true
     // Applied to every request and socket; it only changes anything once a host has a rule.
     val builder = CustomClientBuilder { b ->
       if (rules.isNotEmpty()) b.sslSocketFactory(socketFactory, trust).hostnameVerifier(hostnames)
     }
     NetworkingModule.setCustomClientBuilder(builder)
     WebSocketModule.setCustomClientBuilder(builder)
+    // The app's fetch is expo/fetch (Expo SDK 57 installs it globally), which builds
+    // one client from OkHttpClientProvider and keeps it, so a rule set later can't be
+    // added per request. Its client always carries the trust manager and name check
+    // instead: they defer to the phone's own, so nothing changes until a host has a rule.
+    OkHttpClientProvider.setOkHttpClientFactory {
+      val base = context?.let { OkHttpClientProvider.createClientBuilder(it) } ?: OkHttpClientProvider.createClientBuilder()
+      base.sslSocketFactory(socketFactory, trust).hostnameVerifier(hostnames).build()
+    }
   }
 }
