@@ -7,7 +7,7 @@ import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { LiveOven, type Paired } from '../src/api/client';
 import { normalizeHost, urls } from '../src/api/endpoint';
-import { MjpegParser, NotAStreamError, boundaryOf, readMjpeg } from '../src/api/mjpeg';
+import { MjpegParser, NotAStreamError, boundaryOf, jpegEnd, readMjpeg } from '../src/api/mjpeg';
 import { fromB64, generateKeys } from '../src/api/protocol';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -29,6 +29,30 @@ function jpeg(n: number, size = 3000): Uint8Array {
   if (size > 120) b.set(new TextEncoder().encode('\r\n--frame\r\n'), 100);
   b.set([0xff, 0xd9], size - 2);
   return b;
+}
+
+/**
+ * A JPEG with real marker structure: an EXIF thumbnail (its own SOI…EOI) inside
+ * APP1, then scan data with stuffed FF 00 bytes and a restart marker.
+ */
+function realJpeg(n: number, scanSize = 4000): Uint8Array {
+  const seg = (m: number, body: number[]) => [0xff, m, (body.length + 2) >> 8, (body.length + 2) & 0xff, ...body];
+  const thumb = [0xff, 0xd8, 0xff, 0xdb, 0x00, 0x03, 0x01, 0xff, 0xd9];
+  const scan: number[] = [];
+  for (let i = 0; i < scanSize; i++) {
+    const v = (i * 31 + n * 7) & 0xff;
+    scan.push(v);
+    if (v === 0xff) scan.push(0x00);
+    if (i === scanSize >> 1) scan.push(0xff, 0xd3);
+  }
+  return Uint8Array.from([
+    0xff, 0xd8,
+    ...seg(0xe1, [...Buffer.from('Exif\0\0'), ...thumb, n]),
+    ...seg(0xdb, [0, 1, 2, 3]),
+    ...seg(0xda, [1, 1, 0, 0, 0x3f, 0]),
+    ...scan,
+    0xff, 0xd9,
+  ]);
 }
 
 /** One part exactly as serveMJPEG writes it. */
@@ -94,9 +118,34 @@ const part = (j: Uint8Array) => Buffer.concat([
   console.log('✓ MJPEG parts split by Content-Length, in any chunking');
 }
 
+// --- the stream as iOS hands it over -------------------------------------------
+{
+  // URLSession strips the multipart: JPEGs back to back, nothing in between.
+  const frames = [realJpeg(1), realJpeg(2, 60_000), realJpeg(3, 10)];
+  for (const f of frames) assert.equal(jpegEnd(f, 0), f.length);
+  assert.equal(jpegEnd(frames[0].slice(0, -1), 0), -1);
+  const wire = new Uint8Array(Buffer.concat(frames));
+  const same = (got: Uint8Array[]) => {
+    assert.equal(got.length, frames.length);
+    got.forEach((g, i) => assert.deepEqual(g, frames[i]));
+  };
+  for (const boundary of ['frame', null]) {
+    same(new MjpegParser(boundary).push(wire));
+    for (const size of [1, 997]) {
+      const p = new MjpegParser(boundary);
+      const got: Uint8Array[] = [];
+      for (let i = 0; i < wire.length; i += size) got.push(...p.push(wire.subarray(i, i + size)));
+      same(got);
+    }
+  }
+  // Each picture shows as soon as it is whole, not when the next one starts.
+  assert.equal(new MjpegParser('frame').push(frames[0]).length, 1);
+  console.log('✓ bare JPEGs back to back (iOS) split at each picture’s end, in any chunking');
+}
+
 // --- a june-local stand-in -----------------------------------------------------
 
-type Mode = 'stream' | 'drop-after-one' | 'old';
+type Mode = 'stream' | 'drop-after-one' | 'ios' | 'old';
 const log: string[] = [];
 let mode: Mode = 'stream';
 let openStreams = 0;
@@ -111,6 +160,15 @@ const server = createServer((req, res: ServerResponse) => {
   }
   if (path === '/media/prod/images/latest.jpg') {
     res.writeHead(200, { 'Content-Type': 'image/jpeg' }).end(Buffer.from(still));
+    return;
+  }
+  if (path === '/media/stream.mjpg' && mode === 'ios') {
+    // What expo/fetch on iOS passes on: the first part's type, then bare JPEGs.
+    res.writeHead(200, { 'Content-Type': 'image/jpeg', Connection: 'close' });
+    openStreams++;
+    let n = 0;
+    const tick = setInterval(() => res.write(Buffer.from(realJpeg(++n))), 50);
+    res.on('close', () => { clearInterval(tick); openStreams--; log.push('stream closed'); });
     return;
   }
   if (path === '/media/stream.mjpg' && mode !== 'old') {
@@ -177,6 +235,20 @@ async function main() {
     stop();
     assert.ok(log.filter((l) => l === 'GET /media/stream.mjpg').length >= 2);
     console.log('✓ watchCamera reconnects when the stream drops');
+  }
+
+  {
+    // The stream as iOS delivers it still plays, and still closes on stop.
+    mode = 'ios';
+    log.length = 0;
+    const uris: string[] = [];
+    const stop = link.watchCamera((u) => uris.push(u));
+    await until('three frames', () => uris.length >= 3);
+    assert.deepEqual(fromB64(uris[0].slice('data:image/jpeg;base64,'.length)), realJpeg(1));
+    stop();
+    await until('stream closed after stop', () => openStreams === 0);
+    assert.ok(!log.some((l) => l.includes('/internal/camera')), 'no fallback to stills');
+    console.log('✓ watchCamera plays the stream as iOS delivers it');
   }
 
   {
