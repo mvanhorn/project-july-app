@@ -15,7 +15,14 @@ a few minutes to appear after that. No oven yet? Tap **Try the demo first** in t
 You'll also need [june-local](https://github.com/prj-july) running on your home
 network to control a real oven. Feedback: hello@project-july.org
 
-An iPhone version isn't available yet.
+## Get the app (iPhone)
+
+Project July is in **beta on TestFlight**, and anyone can join:
+
+1. **Install TestFlight** (Apple's free app for testing apps): <https://apps.apple.com/app/testflight/id899247664>
+2. **Join the beta** by opening this link on your iPhone, then **Accept** and **Install**: <https://testflight.apple.com/join/duDPqwBk>
+
+Updates arrive through TestFlight.
 
 ---
 
