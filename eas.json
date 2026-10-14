@@ -24,18 +24,6 @@
       "extends": "base",
       "autoIncrement": true,
       "channel": "production"
-    },
-    "testflight": {
-      "extends": "production",
-      "channel": "beta",
-      "env": {
-        "APP_VARIANT": "beta"
-      }
-    }
-  },
-  "submit": {
-    "testflight": {
-      "ios": {}
     }
   }
 }
