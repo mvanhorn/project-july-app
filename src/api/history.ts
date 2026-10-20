@@ -7,7 +7,8 @@ export const HISTORY_CAP = 50;
 /** A phone start and the oven going active can land a few seconds apart. */
 export const MERGE_MS = 8_000;
 
-export type HistoryOutcome = 'running' | 'completed' | 'cancelled';
+/** `ended`: the oven was found idle without seeing how the cook ended (the app was closed). */
+export type HistoryOutcome = 'running' | 'completed' | 'cancelled' | 'ended';
 
 export type HistoryEntry = {
   id: string;
@@ -36,6 +37,12 @@ export type LiveCook = {
   ended: 'completed' | 'cancelled' | null;
   mode: string | null;
   targetC: number | null;
+  /** How long the running cook has gone, when the oven says. */
+  elapsedMs?: number | null;
+  /** When the end was reported, in this app's clock. */
+  endedAt?: number | null;
+  /** When the oven last reported its state; null while that may be stale. */
+  statusAt?: number | null;
 };
 
 export type HistoryDay = { key: string; label: string; entries: HistoryEntry[] };
@@ -103,15 +110,24 @@ export function noteLive(list: HistoryEntry[], ovenId: string, live: LiveCook, a
   const running = list.find((e) => e.ovenId === ovenId && e.outcome === 'running');
   if (live.active) {
     if (running || !live.mode) return list;
+    // A cook found already going (the app just opened) started when the oven says.
+    const elapsed = live.elapsedMs && live.elapsedMs > 0 ? live.elapsedMs : 0;
     return beginCook(list, {
       ovenId,
       mode: live.mode,
       tempF: liveTempF(live.mode, live.targetC),
-      at,
+      at: at - elapsed,
     });
   }
-  if (running && (live.ended === 'completed' || live.ended === 'cancelled')) {
-    return list.map((e) => (e.id === running.id ? { ...e, outcome: live.ended!, endedAt: at } : e));
+  if (!running) return list;
+  if (live.ended === 'completed' || live.ended === 'cancelled') {
+    const endedAt = live.endedAt && live.endedAt >= running.startedAt ? live.endedAt : at;
+    return list.map((e) => (e.id === running.id ? { ...e, outcome: live.ended!, endedAt } : e));
+  }
+  // Idle by a report from after the start, with no end seen: it ended while the app
+  // wasn't listening. (A report within MERGE_MS of a start may predate it.)
+  if (live.statusAt && live.statusAt - running.startedAt > MERGE_MS) {
+    return list.map((e) => (e.id === running.id ? { ...e, outcome: 'ended' as const } : e));
   }
   return list;
 }
@@ -172,13 +188,14 @@ export function cookLength(ms: number): string {
 export function outcomeLabel(outcome: HistoryOutcome): string {
   if (outcome === 'running') return 'Cooking';
   if (outcome === 'completed') return 'Finished';
+  if (outcome === 'ended') return 'Ended';
   return 'Stopped';
 }
 
 export function entryLine(e: HistoryEntry, now: number): string {
   const when = whenLabel(e.startedAt, now);
   if (e.outcome === 'running') return `${when} · cooking`;
-  const outcome = e.outcome === 'completed' ? 'finished' : 'stopped';
+  const outcome = outcomeLabel(e.outcome).toLowerCase();
   const dur = e.endedAt && e.endedAt > e.startedAt ? cookLength(e.endedAt - e.startedAt) : null;
   return dur ? `${when} · ${dur} · ${outcome}` : `${when} · ${outcome}`;
 }

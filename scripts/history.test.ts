@@ -90,7 +90,30 @@ const live = (over: Partial<LiveCook> = {}): LiveCook => ({
   assert.equal(stopped[0].outcome, 'cancelled');
   const idle = noteLive(running, oven, live({ active: false, ended: null }), t0 + 30_000);
   assert.equal(idle, running);
+  const late = noteLive(running, oven, live({ active: false, ended: 'completed', endedAt: t0 + 5 * 60_000 }), t0 + 60 * 60_000);
+  assert.equal(late[0].endedAt, t0 + 5 * 60_000);
   console.log('✓ finishing or stopping closes the running row; a quiet idle does not');
+}
+
+{
+  // Finished while the phone was locked: the oven is idle on a report from after the start.
+  const running = beginCook([], start(), 'bake');
+  assert.equal(noteLive(running, oven, live({ active: false, statusAt: t0 + 2_000 }), t0 + 2_000), running);
+  const found = noteLive(running, oven, live({ active: false, statusAt: t0 + 60 * 60_000 }), t0 + 60 * 60_000);
+  assert.equal(found[0].outcome, 'ended');
+  assert.equal(found[0].endedAt, undefined);
+  assert.equal(entryLine(found[0], t0 + 60 * 60_000).endsWith('· ended'), true);
+  // Then a cook started on the oven gets its own row.
+  const next = noteLive(found, oven, live({ active: true, mode: 'roast', targetC: 204.444, statusAt: t0 + 61 * 60_000 }), t0 + 61 * 60_000);
+  assert.equal(next.length, 2);
+  assert.equal(next[0].mode, 'roast');
+  console.log('✓ a cook that ended unseen closes on the next idle report, and the next one is recorded');
+}
+
+{
+  const found = noteLive([], oven, live({ active: true, mode: 'bake', targetC: 176.667, elapsedMs: 20 * 60_000 }), t0);
+  assert.equal(found[0].startedAt, t0 - 20 * 60_000);
+  console.log('✓ a cook found already going is dated from when it started');
 }
 
 {

@@ -524,7 +524,10 @@ export function OvenProvider({ children }: { children: ReactNode }) {
     const unsubs = ovens.map((o) => {
       const apply = (s: OvenSnapshot) => {
         setHistory((all) => {
-          const next = noteLive(all, o.id, { active: s.active, ended: s.ended, mode: s.mode, targetC: s.targetC }, Date.now());
+          const next = noteLive(all, o.id, {
+            active: s.active, ended: s.ended, mode: s.mode, targetC: s.targetC,
+            elapsedMs: s.elapsedMs, endedAt: s.endedAt, statusAt: s.statusAt,
+          }, Date.now());
           if (next === all) return all;
           saveHistory(next);
           return next;
