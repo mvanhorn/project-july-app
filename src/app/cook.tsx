@@ -4,7 +4,7 @@ import { Stack, router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { OvenError } from '@/api/client';
 import { MODES, cToF, fToC, formatDuration, isFixed, validPlan, type CookMode } from '@/api/modes';
-import { DELAYS_MIN, MAX_DELAY_MIN, delayLabel, fromDelayMin, startsAtLabel, startsIn } from '@/api/schedule';
+import { DELAYS_MIN, MAX_DELAY_MIN, clampDelayMin, delayLabel, fromDelayMin, startsAtLabel, startsIn } from '@/api/schedule';
 import { GlassFill, ModeTile } from '@/components/glass';
 import { Icon } from '@/components/Icon';
 import { useNow } from '@/components/OvenHero';
@@ -367,7 +367,7 @@ function useLater() {
   const pick = (min: number, fromType = false) => {
     const at = fromDelayMin(Date.now(), min);
     if (!at) return;
-    setDelayMin(min);
+    setDelayMin(clampDelayMin(min));
     setStartAt(at);
     setOpen(true);
     if (!fromType) setTyped('');
@@ -375,8 +375,9 @@ function useLater() {
   const close = () => { setOpen(false); setTyped(''); };
   const type = (text: string) => {
     const digits = text.replace(/\D/g, '').slice(0, 3);
-    setTyped(digits);
     const n = parseInt(digits, 10);
+    // Past 12 hours the field shows the 12 hours the start will use.
+    setTyped(n > MAX_DELAY_MIN ? String(MAX_DELAY_MIN) : digits);
     if (n >= 1) pick(n, true);
   };
   return { open, delayMin, startAt, typed, pick, close, type };

@@ -239,7 +239,7 @@ function OvenPage({ entry, visible }: { entry: OvenEntry; visible: boolean }) {
           </Notice>
         ) : null}
 
-        <ScheduleBanner entryId={entry.id} s={s} unit={unit} run={run} />
+        <ScheduleBanner entryId={entry.id} s={s} unit={unit} run={run} visible={visible} />
 
         {glass ? (
           <GlassHero
@@ -299,9 +299,11 @@ function OvenPage({ entry, visible }: { entry: OvenEntry; visible: boolean }) {
   );
 }
 
-function ScheduleBanner({ entryId, s, unit, run }: {
+function ScheduleBanner({ entryId, s, unit, run, visible }: {
   entryId: string; s: OvenSnapshot; unit: 'F' | 'C';
   run: (key: string, fn: () => Promise<void>) => Promise<void>;
+  /** Only the oven on screen asks; another asks when swiped to. */
+  visible: boolean;
 }) {
   const { schedules, cancelSchedule, startScheduled } = useOven();
   const scheduled = schedules[entryId];
@@ -311,18 +313,14 @@ function ScheduleBanner({ entryId, s, unit, run }: {
   const copy = scheduled ? bannerCopy(scheduled, now, gate, unit) : null;
 
   useEffect(() => {
-    if (!scheduled || copy?.kind !== 'ask') return;
+    if (!visible || !scheduled || copy?.kind !== 'ask') return;
     if (asked.current === scheduled.startAt + ':' + scheduled.createdAt) return;
     asked.current = scheduled.startAt + ':' + scheduled.createdAt;
-    void confirm(
-      copy.title,
-      'Start this cook now? The oven did not preheat at the time you set.',
-      'Start now',
-    ).then((ok) => {
-      if (ok) void run('sched', () => startScheduled(entryId));
-      else cancelSchedule(entryId);
-    });
-  }, [scheduled, copy?.kind, copy?.title, entryId, run, startScheduled, cancelSchedule]);
+    // Not now (or dismissing) leaves the start pending: the banner keeps Cancel and Start now.
+    const why = scheduled.failed ? `The oven did not start: ${scheduled.failed}` : 'The oven did not preheat at the time you set.';
+    void confirm(copy.title, `${why} Start this cook now?`, 'Start now', 'Not now')
+      .then((ok) => { if (ok) void run('sched', () => startScheduled(entryId)); });
+  }, [visible, scheduled, copy?.kind, copy?.title, entryId, run, startScheduled]);
 
   if (!scheduled || !copy) return null;
 
